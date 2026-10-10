@@ -1,0 +1,818 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Magyar Sakkelemző</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: board + eval bar on the left, game panel (moves, commentary) on the right; stacks on phones. */
+:root {
+  --bg: #eef1ee;
+  --surface: #ffffff;
+  --ink: #18201c;
+  --muted: #5b6862;
+  --line: #d5dcd7;
+  --accent: #1f6f5c;
+  --accent-ink: #ffffff;
+  --sq-light: #e4e8d6;
+  --sq-dark: #6f9180;
+  --hl: rgba(240, 200, 60, .55);
+  --arrow: rgba(31, 111, 92, .8);
+  --best: #1f8a5c; --good: #4f8f3a; --ok: #7f8c3a; --inacc: #c99a1b; --mistake: #d9721b; --blunder: #c63d32; --forced: #6b7a99;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121614; --surface: #1b211e; --ink: #e5ebe7; --muted: #94a39b; --line: #2e3833;
+  --accent: #4fb596; --accent-ink: #0d1411; --sq-light: #b9c2ad; --sq-dark: #4d6b5d;
+  --hl: rgba(240, 200, 60, .5); --arrow: rgba(120, 220, 180, .85); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121614; --surface: #1b211e; --ink: #e5ebe7; --muted: #94a39b; --line: #2e3833;
+  --accent: #4fb596; --accent-ink: #0d1411; --sq-light: #b9c2ad; --sq-dark: #4d6b5d;
+  --hl: rgba(240, 200, 60, .5); --arrow: rgba(120, 220, 180, .85); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 16px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 3vw, 2.2rem); letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-family: var(--font-display); font-size: .95rem; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* Board */
+.board-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.player { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-weight: 500; gap: 8px; }
+.player .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.player .who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--muted); flex: none; }
+.chip.w { background: #f6f6f0; } .chip.b { background: #1d1d1d; }
+.board-row { display: flex; gap: 8px; }
+.evalbar { width: 18px; flex: none; border-radius: 4px; overflow: hidden; background: #2a2a2a; position: relative; border: 1px solid var(--line); }
+.evalbar .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #f2f2ea; transition: height .4s ease; }
+.evalbar .num { position: absolute; left: 0; right: 0; font: 600 9px/1 var(--font-mono); text-align: center; color: #555; bottom: 4px; z-index: 1; }
+.evalbar .num.top { top: 4px; bottom: auto; color: #ddd; }
+.board-wrap { position: relative; flex: 1; min-width: 0; aspect-ratio: 1; max-width: 100%; }
+.board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 0 var(--line), 0 6px 24px rgba(0,0,0,.12); user-select: none; }
+.sq { position: relative; display: flex; align-items: center; justify-content: center; container-type: size; }
+.sq.l { background: var(--sq-light); } .sq.d { background: var(--sq-dark); }
+.sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--hl); }
+.sq .coord { position: absolute; font: 600 clamp(8px, 1.4cqw + 6px, 12px)/1 var(--font-mono); opacity: .75; pointer-events: none; }
+.sq.l .coord { color: var(--sq-dark); } .sq.d .coord { color: var(--sq-light); }
+.sq .coord.f { right: 3px; bottom: 2px; } .sq .coord.r { left: 3px; top: 3px; }
+.pc { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", "Arial Unicode MS", serif; font-size: 78cqh; line-height: 1; }
+.pc span { position: absolute; }
+.pc .fillw { color: #fbfbf5; } .pc .outl { color: #1b1b1b; }
+.pc .fillb { color: #161616; text-shadow: 0 0 1px rgba(255,255,255,.35); }
+.arrows { position: absolute; inset: 0; pointer-events: none; }
+
+.controls { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font-family: var(--font-display); font-size: .95rem; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 12px; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, .mv:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.controls button { flex: 1 1 0; min-width: 44px; font-family: var(--font-mono); }
+.controls button.flip { flex: 0 0 auto; font-family: var(--font-display); }
+.engine-status { font: .8rem var(--font-mono); color: var(--muted); }
+
+/* Panel */
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.game-pick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.game-pick label { font-family: var(--font-display); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+select { flex: 1 1 260px; min-width: 0; font: 1rem var(--font-display); padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.meta { margin-top: 10px; font-family: var(--font-display); color: var(--muted); font-size: .9rem; }
+.meta b { color: var(--ink); font-weight: 500; }
+
+.comment-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+.comment-head .mvname { font: 600 1.3rem var(--font-mono); }
+.badge { font: 600 .78rem var(--font-display); letter-spacing: .03em; padding: 3px 9px; border-radius: 999px; color: #fff; background: var(--muted); }
+.engine-line { font: .85rem var(--font-mono); color: var(--muted); margin: 0 0 10px; overflow-wrap: anywhere; }
+.engine-line b { color: var(--ink); font-weight: 600; }
+.comment { font-size: 1.05rem; max-width: 68ch; }
+.comment p { margin: 0 0 .7em; }
+.comment.empty { color: var(--muted); font-style: italic; }
+.ai { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.ai-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ai-out { margin-top: 12px; max-width: 68ch; }
+.ai-out h4 { font-family: var(--font-display); font-size: 1rem; margin: 1em 0 .3em; color: var(--accent); }
+.ai-out h4:first-child { margin-top: 0; }
+.ai-out p { margin: 0 0 .6em; }
+.ai-out ul { margin: 0 0 .6em; padding-left: 1.2em; }
+.ai-note { font: .8rem var(--font-display); color: var(--muted); }
+.ask { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.ask input { flex: 1 1 220px; min-width: 0; font: 1rem var(--font-body); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+
+.moves { max-height: 340px; overflow-y: auto; font-family: var(--font-mono); font-size: .95rem; display: grid; grid-template-columns: 3.2em 1fr 1fr; row-gap: 2px; }
+.moves .no { color: var(--muted); padding: 3px 0; }
+.mv { padding: 3px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.mv:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.mv.cur { background: var(--accent); color: var(--accent-ink); }
+.mv .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.mv .has-c { font-size: .7em; opacity: .7; }
+.section-label { font: 600 .78rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font: .8rem var(--font-display); color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+details.import summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; }
+details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font: .85rem var(--font-mono); padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+.import-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.err { color: var(--blunder); font: .9rem var(--font-display); }
+.hint { font: .85rem var(--font-display); color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .evalbar .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Magyar <span>Sakkelemző</span></h1>
+    <div class="sub">Híres játszmák lépésenként, magyar magyarázattal · ← → billentyűkkel léptethető</div>
+  </header>
+
+  <div class="layout">
+    <div class="board-col">
+      <div class="player" id="pTop"></div>
+      <div class="board-row">
+        <div class="evalbar" id="evalbar" title="Motor értékelése"><div class="fill" id="evalFill"></div><div class="num" id="evalNum">0.0</div></div>
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+          <svg class="arrows" id="arrows" viewBox="0 0 800 800" aria-hidden="true">
+            <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--arrow)"/></marker></defs>
+            <g id="arrowG"></g>
+          </svg>
+        </div>
+      </div>
+      <div class="player" id="pBot"></div>
+      <div class="controls">
+        <button id="bStart" aria-label="Elejére">|◀</button>
+        <button id="bPrev" aria-label="Vissza">◀</button>
+        <button id="bNext" aria-label="Előre">▶</button>
+        <button id="bEnd" aria-label="Végére">▶|</button>
+        <button id="bFlip" class="flip">Tábla forgatása</button>
+      </div>
+      <div class="engine-status" id="engineStatus">Stockfish motor betöltése…</div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="game-pick">
+          <label for="gameSel">Játszma</label>
+          <select id="gameSel"></select>
+        </div>
+        <div class="meta" id="meta"></div>
+      </div>
+
+      <div class="card" aria-live="polite">
+        <div class="comment-head">
+          <span class="mvname" id="mvName">Kiinduló állás</span>
+          <span class="badge" id="badge" hidden></span>
+        </div>
+        <p class="engine-line" id="engineLine"></p>
+        <div class="comment" id="comment"></div>
+        <div class="ai" id="aiBox" hidden>
+          <div class="ai-actions">
+            <button class="primary" id="aiBtn">Részletes elemzés Claude-dal</button>
+            <button id="aiStop" hidden>Leállítás</button>
+            <span class="ai-note" id="aiNote"></span>
+          </div>
+          <div class="ai-out" id="aiOut"></div>
+          <form class="ask" id="askForm">
+            <input id="askInput" type="text" placeholder="Kérdezz erről az állásról, pl. „Miért nem üthetett a huszár?”" aria-label="Kérdés az állásról">
+            <button type="submit" id="askBtn">Kérdezek</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="section-label">Lépések</p>
+        <div class="moves" id="moves"></div>
+        <div class="legend">
+          <span><i style="background:var(--best)"></i>Legjobb</span>
+          <span><i style="background:var(--good)"></i>Kiváló</span>
+          <span><i style="background:var(--ok)"></i>Jó</span>
+          <span><i style="background:var(--inacc)"></i>Pontatlanság</span>
+          <span><i style="background:var(--mistake)"></i>Hiba</span>
+          <span><i style="background:var(--blunder)"></i>Baklövés</span>
+          <span>✎ = kész kommentár</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <details class="import" id="importBox">
+          <summary>Saját játszma betöltése (PGN)</summary>
+          <p class="hint">Chess.com: a játszma alatt Megosztás → PGN → Másolás. Lichess, chessgames.com és pgnmentor.com játszmái is működnek. Illeszd be ide:</p>
+          <textarea id="pgnIn" placeholder='[White "Polgár Judit"]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 ...'></textarea>
+          <div class="import-row"><button class="primary" id="pgnLoad">Betöltés</button><span class="err" id="pgnErr"></span></div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+// ---------- Beépített játszmák magyar kommentárral (kulcs: lépés sorszáma 0-tól, félépésben) ----------
+const GAMES = [
+{ id: "opera", title: "Az Operajátszma", white: "Paul Morphy", black: "Braunschweigi herceg és Isouard gróf", event: "Párizs, Olasz Opera páholya", year: "1858", result: "1–0", opening: "Philidor-védelem",
+  intro: "Morphy egy operaelőadás szünetében játszott két nemes ellen, akik konzultálva közösen léptek. A játszma a fejlődés és a vonalnyitás iskolapéldája: világos minden tisztjét bevonja a támadásba, míg sötét figurái otthon maradnak.",
+  moves: "e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#",
+  c: {
+    0: "Klasszikus királygyalog-nyitás. Világos elfoglalja a centrumot, és egyszerre nyit utat a vezérnek és az f1-futónak.",
+    1: "Sötét szimmetrikusan válaszol, és megveti lábát a centrumban.",
+    2: "A huszár a legjobb mezőjére fejlődik, és rögtön támadja az e5-gyalogot. Ez a nyitás alapelve: tempóval fejlődni.",
+    3: "Philidor-védelem. Szilárd, de passzív: a d6-gyalog bezárja az f8-futót a gyaloglánc mögé, így sötét lassabban fejlődik.",
+    4: "Világos azonnal megnyitja a centrumot. Aki jobban fejlett, annak a nyílt állás kedvez.",
+    5: "Kötés: a futó a huszárt a vezérhez szegezi. Ma 3…exd4-et vagy 3…Hf6-ot tartják jobbnak, mert ez a futó hamarosan elcserélődik, és sötét elveszíti a futópárt.",
+    6: "Világos üt. Most már 4…dxe5 5.Vxd8+ Kxd8 6.Hxe5 után világos gyalogot nyerne, ezért sötét kényszerhelyzetbe kerül.",
+    7: "Szinte kötelező, de fájdalmas: sötét elcseréli egyetlen fejlett tisztjét. Világos vezére ezzel aktív mezőre jut.",
+    8: "A vezér visszaüt és máris a gyenge f7 pontra néz. A Fc4 után matt fenyeget.",
+    9: "Az anyag egyenlő, de a fejlődésben óriási a különbség: világosnak két tisztje aktív, sötétnek egyetlen tisztje sincs játékban.",
+    10: "Fenyegetés: Vxf7 matt! A futó és a vezér együtt célozza f7-et, amit csak a király véd.",
+    11: "A huszár elzárja az f-vonalat, így a vezér nem jut el f7-re. Egyben fejlődik is – jó lépés.",
+    12: "Kettős támadás: a vezér egyszerre fenyegeti a b7-gyalogot és (a c4-futóval együtt) újra f7-et.",
+    13: "A vezér védi f7-et, a b7-gyalogot viszont feladja. Ha 8.Vxb7, akkor 8…Vb4+ vezércserét kényszerít, és sötét védekezése megkönnyebbül.",
+    14: "Morphy nem kapzsi: gyalograblás helyett fejleszt. A támadásban a tempó többet ér egy gyalognál.",
+    15: "Szilárdítja a b5 és d5 mezőket, és helyet csinál a vezérnek – de ez újra gyaloglépés fejlődés helyett. Sötét lemaradása nő.",
+    16: "Újabb kötés: a futó az f6-huszárt a vezérhez szegezi. Világos minden könnyűtisztje aktív.",
+    17: "Sötét el akarja űzni a c4-futót, hogy enyhítse az f7 elleni nyomást. De ezzel megnyitja a vezérszárnyat, miközben a sötét király még középen áll.",
+    18: "Áldozat! Morphy odaadja a huszárt, hogy vonalakat nyisson a középen ragadt király ellen.",
+    19: "Sötét elfogadja. A vonalak megnyílnak.",
+    20: "Sakk! A futó visszaszerez egy gyalogot, és a d7-en keresztül kötést hoz létre a sötét király előtt.",
+    21: "Az egyetlen értelmes védekezés, de a d7-huszár most kötve áll: nem mozdulhat, mert a király sakkba kerülne.",
+    22: "Hosszú sánc: a király biztonságba kerül, a bástya pedig egyetlen lépéssel a nyílt d-vonalra áll, és a kötött d7-huszárt támadja.",
+    23: "Sötét még egy védővel erősíti meg a d7-et.",
+    24: "Bástyaáldozat! Világos a minőséget adja oda, hogy szétverje a sötét védelmet.",
+    25: "Sötét visszaüt, de most a d7-bástya áll kötve a király előtt.",
+    26: "A második bástya is a d-vonalra jön, és ismét a kötött figurát támadja. Világos összes tisztje részt vesz a támadásban, sötét királyszárnya pedig még mindig fejletlen.",
+    27: "A vezér újabb védőként érkezik d7-hez, és közben a b3-vezér cseréjét kínálja.",
+    28: "Világos leüti a bástyát, sakkal. Az anyag most már nem számít – csak az idő.",
+    29: "A huszár kénytelen visszaütni. Ezzel elhagyja az f6 mezőt, és megnyílik a g5–d8 átló.",
+    30: "Vezéráldozat! A vezér sakkot ad b8-on, és arra kényszeríti a huszárt, hogy leüsse – így a huszár nem védheti tovább a d8 mezőt.",
+    31: "Kényszerlépés: a huszár üt, és ezzel elhagyja a d7 mezőt.",
+    32: "Matt! A bástya d8-on ad mattot, a g5-futó védelme alatt. Világos a vezért és egy bástyát feláldozva, két megmaradt tisztjével mattol – a fejlődés és az összjáték tökéletes példája."
+  }},
+{ id: "reti", title: "Réti csapdája", white: "Réti Richárd", black: "Savielly Tartakower", event: "Bécs", year: "1910", result: "1–0", opening: "Caro–Kann-védelem",
+  intro: "Réti Richárd a Magyar Királyságban, Bazinban született, a hipermodern iskola egyik atyja. Ez a rövid játszma minden idők egyik leghíresebb miniatűrje: vezéráldozat, kettős sakk és matt 11 lépésben.",
+  moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Qd3 e5 dxe5 Qa5+ Bd2 Qxe5 O-O-O Nxe4 Qd8+ Kxd8 Bg5+ Kc7 Bd8#",
+  c: {
+    0: "Királygyalog-nyitás: a centrum elfoglalása.",
+    1: "Caro–Kann-védelem. Sötét előbb a c6-gyaloggal előkészíti a …d5-öt, így a centrumért szilárd gyalogszerkezettel harcol.",
+    2: "Világos klasszikus módon két gyaloggal foglalja el a centrumot.",
+    3: "Sötét azonnal megtámadja az e4-gyalogot – ez a Caro–Kann lényege.",
+    4: "A huszár fejlődik és védi e4-et.",
+    5: "Sötét elcseréli a centrumgyalogot, megnyitva a játékot.",
+    6: "Világos huszárral üt vissza, és az e4-en centrális helyre kerül.",
+    7: "Sötét huszárja támadja az e4-huszárt. Csere vagy visszavonulás következik.",
+    8: "Szokatlan lépés! A vezér védi a huszárt és előkészíti a hosszú sáncot. Kockázatos, mert a vezér a d-vonalon áll – később ez lesz a döntő motívum.",
+    9: "Sötét a centrumot nyitja, kihasználva, hogy világos vezére a d-vonalon áll. Ambiciózus, de a saját királya is középen marad.",
+    10: "Világos leüti a gyalogot, és a d-vonal megnyílik.",
+    11: "Sakk, és sötét vissza akarja nyerni a gyalogot az e5-ön.",
+    12: "Futóval védi a sakkot, és közben fejlődik – egyben előkészíti a hosszú sáncot.",
+    13: "Sötét visszanyerte a gyalogot, az anyag egyenlő.",
+    14: "Csapda! Világos hosszú sáncol, és látszólag 'odaadja' az e4-huszárt: a bástya most a d-vonalon áll, a vezér mögött.",
+    15: "Sötét bekapja a csalit. A huszár leütése után azonban a d-vonal végzetessé válik a középen álló sötét király számára.",
+    16: "Vezéráldozat! 9.Vd8+ – a vezért adja oda, hogy a sötét királyt a d-vonalra csalja.",
+    17: "Kényszerlépés: a király kénytelen ütni (a vezért más nem üthette, és Ke7 nem lehetséges).",
+    18: "Kettős sakk! A g5-futó és a d1-bástya egyszerre ad sakkot. Kettős sakk ellen csak a király lépése segít.",
+    19: "Ha 10…Ke8, akkor 11.Bd8 matt. A király c7-re menekül…",
+    20: "Matt! A futó d8-on mattot ad. A d1-bástya fedezi a d-vonalat, a sötét király saját figurái közé szorult. Világos vezért és huszárt áldozva, 11 lépésben nyert."
+  }},
+{ id: "immortal", title: "A Halhatatlan játszma", white: "Adolf Anderssen", black: "Lionel Kieseritzky", event: "London", year: "1851", result: "1–0", opening: "Királycsel, Bryan-ellencsel",
+  intro: "A romantikus sakk korszakának jelképe. Anderssen mindkét bástyáját, a vezérét és egy futót feláldoz, majd három könnyűtiszttel mattot ad.",
+  moves: "e4 e5 f4 exf4 Bc4 Qh4+ Kf1 b5 Bxb5 Nf6 Nf3 Qh6 d3 Nh5 Nh4 Qg5 Nf5 c6 g4 Nf6 Rg1 cxb5 h4 Qg6 h5 Qg5 Qf3 Ng8 Bxf4 Qf6 Nc3 Bc5 Nd5 Qxb2 Bd6 Bxg1 e5 Qxa1+ Ke2 Na6 Nxg7+ Kd8 Qf6+ Nxf6 Be7#",
+  c: {
+    2: "Királycsel: világos gyalogot ajánl fel, hogy megnyissa az f-vonalat és gyorsan támadhasson. A 19. század kedvenc nyitása.",
+    3: "Sötét elfogadja a cselt.",
+    5: "Sakk! A vezér kihasználja, hogy az e1–h4 átló gyenge. Világos király nem sáncolhat többé.",
+    6: "A király kénytelen elmozdulni, de a sötét vezér is kiszolgáltatott helyzetbe kerül, ahol tempót lehet nyerni ellene.",
+    7: "Bryan-ellencsel: sötét gyalogot ad, hogy elterelje a c4-futót az f7-ről.",
+    16: "A huszár f5-ön erős mezőt foglal el, és g7-et támadja.",
+    18: "Világos gyalogjaival űzi a sötét vezért és huszárt, tempót nyerve.",
+    20: "Futóáldozat! Anderssen nem menti a b5-futót, hanem a bástyát hozza fedezékbe. Világos fejlődésbeli előnyét fontosabbnak tartja az anyagnál.",
+    21: "Sötét leüti a futót, egy egész tiszttel több.",
+    30: "Fejlődés: a vezérszárnyi huszár is beavatkozik.",
+    32: "A huszár d5-re ugrik, fenyeget Hc7+-szal és a vezér beszorításával. Sötét kapzsi lépést választ.",
+    33: "Sötét gyalogot üt és mindkét világos bástyát támadja. Anyagilag nyer, de vezére messze kerül a királyától.",
+    34: "Az egyik leghíresebb lépés a sakk történetében: Anderssen nem védi a bástyákat! Mindkettőt feláldozza, hogy a futó elvágja a sötét király útját (f8 mező).",
+    35: "Sötét leüti az egyik bástyát.",
+    36: "Csendes lépés! Az e5-gyalog elzárja a sötét vezért a g7 mező védelmétől. Ez készíti elő a mattot.",
+    37: "Sötét a második bástyát is leüti, sakkal. Anyagilag óriási előnyben van – de már késő.",
+    38: "A király lép, és a sötét sakkok elfogytak.",
+    40: "Sakk! A huszár g7-en üt, a sötét király a d8-ra kényszerül.",
+    41: "Az egyetlen lépés.",
+    42: "Vezéráldozat! A vezér f6-on sakkot ad, és a huszár kénytelen leütni – ezzel nyílik meg az e7 mező a futó előtt.",
+    43: "Kényszerlépés.",
+    44: "Matt! Világos egy futóval és két huszárral mattol, miközben két bástyát, a vezért és egy futót áldozott. A d5-huszár fedezi c7-et és e7-et, a d6-futó elvágja a menekülést."
+  }},
+{ id: "evergreen", title: "Az Örökzöld játszma", white: "Adolf Anderssen", black: "Jean Dufresne", event: "Berlin", year: "1852", result: "1–0", opening: "Evans-csel",
+  intro: "Steinitz nevezte el 'örökzöld babérnak Anderssen koszorújában'. A csúcspont egy gyönyörű áldozatsorozat, amely kettős sakkal zárul.",
+  moves: "e4 e5 Nf3 Nc6 Bc4 Bc5 b4 Bxb4 c3 Ba5 d4 exd4 O-O d3 Qb3 Qf6 e5 Qg6 Re1 Nge7 Ba3 b5 Qxb5 Rb8 Qa4 Bb6 Nbd2 Bb7 Ne4 Qf5 Bxd3 Qh5 Nf6+ gxf6 exf6 Rg8 Rad1 Qxf3 Rxe7+ Nxe7 Qxd7+ Kxd7 Bf5+ Ke8 Bd7+ Kf8 Bxe7#",
+  c: {
+    6: "Evans-csel: világos gyalogot áldoz, hogy tempót nyerve felépítse a c3–d4 centrumot.",
+    7: "Sötét elfogadja a cselt.",
+    10: "A centrum megnyitása: világos fejlődési előnye így érvényesülhet.",
+    12: "Sánc: a király biztonságban, a bástya hamarosan a nyílt vonalra kerül.",
+    20: "A futó a hosszú átlón elvágja a sötét király útját – sötét nem tud sáncolni.",
+    32: "Huszáráldozat! A g-vonal megnyílik, és a sötét király tartósan középen ragad.",
+    36: "Az egyik leghíresebb csendes lépés: világos nem védekezik a …Vxf3 fenyegetés ellen, hanem a d-vonalra hozza a bástyát. Sötét leüti a huszárt, de a támadás gyorsabb.",
+    37: "Sötét üt, és saját matt-fenyegetést állít fel a g-vonalon. Világosnak sakkokkal kell nyernie.",
+    38: "Sakk! A bástya áldozza magát, hogy elterelje a huszárt az e7-ről.",
+    40: "Vezéráldozat! A vezér d7-en sakkot ad, a király kénytelen leütni.",
+    42: "Kettős sakk: a f5-futó és a d1-bástya egyszerre ad sakkot.",
+    44: "Sakk – a király a f8-ra kényszerül.",
+    46: "Matt! A futó e7-en mattot ad. A f6-gyalog és a futók hálója zárja körbe a királyt."
+  }},
+{ id: "century", title: "Az évszázad játszmája", white: "Donald Byrne", black: "Bobby Fischer", event: "New York, Rosenwald-emlékverseny", year: "1956", result: "0–1", opening: "Grünfeld-védelem (Hf3 lépésrenddel)",
+  intro: "A 13 éves Fischer egy vezéráldozattal és egy 'malom' sakksorozattal semmisíti meg az erős Byrne-t. A játszma a modern dinamikus sakk mintapéldája.",
+  moves: "Nf3 Nf6 c4 g6 Nc3 Bg7 d4 O-O Bf4 d5 Qb3 dxc4 Qxc4 c6 e4 Nbd7 Rd1 Nb6 Qc5 Bg4 Bg5 Na4 Qa3 Nxc3 bxc3 Nxe4 Bxe7 Qb6 Bc4 Nxc3 Bc5 Rfe8+ Kf1 Be6 Bxb6 Bxc4+ Kg1 Ne2+ Kf1 Nxd4+ Kg1 Ne2+ Kf1 Nc3+ Kg1 axb6 Qb4 Ra4 Qxb6 Nxd1 h3 Rxa2 Kh2 Nxf2 Re1 Rxe1 Qd8+ Bf8 Nxe1 Bd5 Nf3 Ne4 Qb8 b5 h4 h5 Ne5 Kg7 Kg1 Bc5+ Kf1 Ng3+ Ke1 Bb4+ Kd1 Bb3+ Kc1 Ne2+ Kb1 Nc3+ Kc1 Rc2#",
+  c: {
+    9: "Sötét a centrumban üt vissza: Grünfeld-szerű szerkezet, ahol sötét a világos centrumot alakzataival támadja.",
+    20: "Világos kötést hoz létre, de a király még középen áll – ezt Fischer ki fogja használni.",
+    21: "Zseniális lépés! A huszár a c3-huszárt támadja; ha világos üt, a vezér a e7-ről és a d-vonalról nem tud egyszerre védekezni.",
+    25: "Sötét gyalogot nyer, és megnyitja az e-vonalat a világos király ellen.",
+    27: "Fischer nem menti az e7-en lévő bástyát (Fxf8 fenyeget), hanem ellentámadást indít.",
+    33: "Az évszázad lépése: Fischer feláldozza a vezérét! A futó a c4-futót támadja, és megnyitja a 'malom' sorozatot.",
+    34: "Byrne elfogadja a vezért.",
+    35: "Sakk! Kezdődik a malom: a futó és a huszár felváltva ad sakkokat, és sorra szedi a világos figurákat.",
+    37: "Felfedett sakk a malom elején.",
+    39: "A huszár leüti a d4-gyalogot, sakkal.",
+    43: "A huszár visszatér c3-ra, és a d1-bástyát támadja.",
+    45: "Fischer végre visszaüti a vezért. Összesítés: bástya, két futó és huszár a vezérért – sötét messze előnyben van.",
+    49: "Sötét a bástyát is begyűjti.",
+    81: "Matt! Fischer a két futóval, a huszárral és a bástyával koordinált hálót sző a világos király köré."
+  }}
+];
+
+// ---------- Segédfüggvények ----------
+const HU = { K: "K", Q: "V", R: "B", B: "F", N: "H" };
+const huSan = s => s.replace(/^[KQRBN]/, m => HU[m]).replace(/=([QRBN])/, (_, p) => "=" + HU[p]);
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const OUTLINE = { k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙" };
+const VS = "︎";
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+};
+
+let game = null;        // { meta, sans[], fens[], comments{} }
+let ply = 0;            // hány lépés történt meg (0 = kiinduló állás)
+let flipped = false;
+
+function buildGame(meta, sans) {
+  const ch = new Chess();
+  const fens = [ch.fen()];
+  for (const s of sans) {
+    const m = ch.move(s, { sloppy: true });
+    if (!m) throw new Error("Szabálytalan lépés: " + s);
+    fens.push(ch.fen());
+  }
+  return { meta, sans: ch.history(), fens, comments: meta.c || {} };
+}
+
+// ---------- Tábla ----------
+function parseFen(fen) {
+  const rows = fen.split(" ")[0].split("/");
+  return rows.map(r => { const out = []; for (const ch of r) { if (/\d/.test(ch)) for (let i = 0; i < +ch; i++) out.push(null); else out.push(ch); } return out; });
+}
+function sqName(r, f) { return "abcdefgh"[f] + (8 - r); }
+function sqXY(name) { const f = name.charCodeAt(0) - 97, r = 8 - +name[1]; return flipped ? [7 - f, 7 - r] : [f, r]; }
+
+function renderBoard() {
+  const b = $("board");
+  const grid = parseFen(game.fens[ply]);
+  const last = ply > 0 ? lastMoveSquares(ply) : [];
+  b.innerHTML = "";
+  for (let vr = 0; vr < 8; vr++) for (let vf = 0; vf < 8; vf++) {
+    const r = flipped ? 7 - vr : vr, f = flipped ? 7 - vf : vf;
+    const name = sqName(r, f);
+    const d = document.createElement("div");
+    d.className = "sq " + ((r + f) % 2 ? "d" : "l") + (last.includes(name) ? " hl" : "");
+    const p = grid[r][f];
+    if (p) {
+      const t = p.toLowerCase(), white = p === p.toUpperCase();
+      const pc = document.createElement("div"); pc.className = "pc";
+      if (white) {
+        const a = document.createElement("span"); a.className = "fillw"; a.textContent = GLYPH[t] + VS;
+        const o = document.createElement("span"); o.className = "outl"; o.textContent = OUTLINE[t] + VS;
+        pc.append(a, o);
+      } else {
+        const a = document.createElement("span"); a.className = "fillb"; a.textContent = GLYPH[t] + VS; pc.append(a);
+      }
+      d.append(pc);
+    }
+    if (vf === 0) { const c = document.createElement("span"); c.className = "coord r"; c.textContent = 8 - r; d.append(c); }
+    if (vr === 7) { const c = document.createElement("span"); c.className = "coord f"; c.textContent = "abcdefgh"[f]; d.append(c); }
+    b.append(d);
+  }
+  const m = game.meta;
+  const top = flipped ? ["w", m.white] : ["b", m.black], bot = flipped ? ["b", m.black] : ["w", m.white];
+  for (const [el, [c, n]] of [[$("pTop"), top], [$("pBot"), bot]]) {
+    el.innerHTML = ""; const who = document.createElement("div"); who.className = "who";
+    const chip = document.createElement("span"); chip.className = "chip " + c;
+    const nm = document.createElement("span"); nm.textContent = n || (c === "w" ? "Világos" : "Sötét");
+    who.append(chip, nm); el.append(who);
+  }
+  drawArrow(null);
+}
+const lastMoveCache = {};
+function lastMoveSquares(p) {
+  const key = game.meta.id + ":" + p;
+  if (!lastMoveCache[key]) { const ch = new Chess(game.fens[p - 1]); const m = ch.move(game.sans[p - 1]); lastMoveCache[key] = m ? [m.from, m.to] : []; }
+  return lastMoveCache[key];
+}
+function drawArrow(uci) {
+  const g = $("arrowG"); g.innerHTML = "";
+  if (!uci) return;
+  const [fx, fy] = sqXY(uci.slice(0, 2)), [tx, ty] = sqXY(uci.slice(2, 4));
+  const c = v => v * 100 + 50;
+  const dx = c(tx) - c(fx), dy = c(ty) - c(fy), len = Math.hypot(dx, dy), sh = 22;
+  const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l.setAttribute("x1", c(fx)); l.setAttribute("y1", c(fy));
+  l.setAttribute("x2", c(tx) - dx / len * sh); l.setAttribute("y2", c(ty) - dy / len * sh);
+  l.setAttribute("stroke", "var(--arrow)"); l.setAttribute("stroke-width", "16"); l.setAttribute("stroke-linecap", "round");
+  l.setAttribute("marker-end", "url(#ah)");
+  g.append(l);
+}
+
+// ---------- Lépéslista ----------
+function renderMoves() {
+  const box = $("moves"); box.innerHTML = "";
+  game.sans.forEach((s, i) => {
+    if (i % 2 === 0) { const n = document.createElement("div"); n.className = "no"; n.textContent = (i / 2 + 1) + "."; box.append(n); }
+    const d = document.createElement("div"); d.className = "mv"; d.tabIndex = 0; d.dataset.ply = i + 1;
+    const dot = document.createElement("span"); dot.className = "dot"; dot.id = "dot" + (i + 1);
+    const t = document.createElement("span"); t.textContent = huSan(s);
+    d.append(dot, t);
+    if (game.comments[i]) { const c = document.createElement("span"); c.className = "has-c"; c.textContent = "✎"; d.append(c); }
+    d.onclick = () => go(i + 1);
+    d.onkeydown = e => { if (e.key === "Enter") go(i + 1); };
+    box.append(d);
+  });
+  if (game.sans.length % 2 === 1) box.append(document.createElement("div"));
+  refreshDots();
+}
+function markCurrent() {
+  document.querySelectorAll(".mv.cur").forEach(e => e.classList.remove("cur"));
+  const cur = document.querySelector(`.mv[data-ply="${ply}"]`);
+  if (cur) { cur.classList.add("cur"); const box = $("moves"); const top = cur.offsetTop - box.offsetTop; if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 30) box.scrollTop = top - box.clientHeight / 2; }
+}
+
+// ---------- Stockfish motor ----------
+const SF_URL = "https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js";
+const DEPTH = 13;
+const evalCache = {};   // fen -> { cp (világos szemszögéből), mate, best, pv[] }
+let engine = null, engineReady = false, queue = [], busy = null;
+
+function initEngine() {
+  try {
+    const blob = new Blob([`importScripts("${SF_URL}");`], { type: "application/javascript" });
+    engine = new Worker(URL.createObjectURL(blob));
+  } catch { return engineFail(); }
+  const t = setTimeout(() => { if (!engineReady) engineFail(); }, 20000);
+  engine.onerror = () => { clearTimeout(t); engineFail(); };
+  engine.onmessage = e => {
+    const line = typeof e.data === "string" ? e.data : "";
+    if (line === "uciok") { engine.postMessage("isready"); }
+    else if (line === "readyok" && !engineReady) { engineReady = true; clearTimeout(t); $("engineStatus").textContent = "Stockfish 10 · mélység " + DEPTH; pump(); }
+    else if (busy) handleEngineLine(line);
+  };
+  engine.postMessage("uci");
+}
+function engineFail() {
+  engineReady = false; engine = null;
+  $("engineStatus").textContent = "A motor nem töltődött be ebben a nézetben – az elemzés motor nélkül is működik.";
+  $("evalbar").hidden = true;
+}
+function handleEngineLine(line) {
+  if (line.startsWith("info") && line.includes(" pv ")) {
+    const sc = line.match(/score (cp|mate) (-?\d+)/), pv = line.split(" pv ")[1];
+    if (sc) { busy.score = { type: sc[1], v: +sc[2] }; busy.pv = pv.trim().split(" "); }
+  } else if (line.startsWith("bestmove")) {
+    const job = busy; busy = null;
+    const stm = job.fen.split(" ")[1];
+    const sign = stm === "w" ? 1 : -1;
+    let res = { best: line.split(" ")[1], pv: job.pv || [] };
+    if (job.score) {
+      if (job.score.type === "mate") { res.mate = job.score.v * sign; res.cp = Math.sign(res.mate) * (10000 - Math.abs(res.mate) * 10); }
+      else res.cp = job.score.v * sign;
+    } else {
+      // nincs lépés: matt vagy patt
+      const ch = new Chess(job.fen);
+      res.cp = ch.in_checkmate() ? (stm === "w" ? -10000 : 10000) : 0;
+      if (ch.in_checkmate()) res.mate = 0;
+      res.best = null;
+    }
+    evalCache[job.fen] = res;
+    job.resolve(res);
+    pump();
+  }
+}
+function analyse(fen) {
+  if (evalCache[fen]) return Promise.resolve(evalCache[fen]);
+  const pending = queue.find(q => q.fen === fen) || (busy && busy.fen === fen ? busy : null);
+  if (pending) return pending.promise;
+  let resolve; const promise = new Promise(r => resolve = r);
+  queue.push({ fen, resolve, promise });
+  pump();
+  return promise;
+}
+function pump() {
+  if (!engineReady || busy || !queue.length) return;
+  // a jelenlegi állás elsőbbséget kap
+  const want = [game.fens[ply], ply > 0 ? game.fens[ply - 1] : null];
+  let idx = queue.findIndex(q => want.includes(q.fen)); if (idx < 0) idx = 0;
+  busy = queue.splice(idx, 1)[0];
+  const ch = new Chess(busy.fen);
+  if (ch.game_over()) { handleEngineLine("bestmove (none)"); return; }
+  engine.postMessage("position fen " + busy.fen);
+  engine.postMessage("go depth " + DEPTH);
+}
+function fmtEval(r) {
+  if (!r) return "…";
+  if (r.mate !== undefined) return r.mate === 0 ? "matt" : (r.mate > 0 ? "M" : "-M") + Math.abs(r.mate);
+  return (r.cp >= 0 ? "+" : "") + (r.cp / 100).toFixed(1);
+}
+function uciToHu(fen, ucis, max = 6) {
+  const ch = new Chess(fen); const out = [];
+  for (const u of ucis.slice(0, max)) {
+    const m = ch.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || "q" });
+    if (!m) break; out.push(huSan(m.san));
+  }
+  return out;
+}
+const CLASSES = {
+  best: ["Legjobb lépés", "--best"], excellent: ["Kiváló", "--good"], good: ["Jó", "--ok"],
+  inacc: ["Pontatlanság", "--inacc"], mistake: ["Hiba", "--mistake"], blunder: ["Baklövés", "--blunder"], forced: ["Kényszerlépés", "--forced"]
+};
+function classify(p, before, after) {
+  const fen = game.fens[p - 1];
+  if (new Chess(fen).moves().length === 1) return "forced";
+  const mover = fen.split(" ")[1] === "w" ? 1 : -1;
+  const uci = lastMoveSquares(p).join("");
+  if (before.best && before.best.slice(0, 4) === uci) return "best";
+  const b = before.cp * mover, a = after.cp * mover;
+  let loss = b - a;
+  if (b > 500 && a > 300) loss = Math.min(loss, 40);    // nyert állásban a kisebb pontatlanság nem számít
+  if (b < -500 && a < -500) loss = Math.min(loss, 40);  // vesztett állásban sem
+  if (loss <= 20) return "excellent";
+  if (loss <= 50) return "good";
+  if (loss <= 100) return "inacc";
+  if (loss <= 250) return "mistake";
+  return "blunder";
+}
+const classCache = {};
+async function classifyPly(p) {
+  const key = game.meta.id + ":" + p;
+  if (classCache[key]) return classCache[key];
+  const [before, after] = await Promise.all([analyse(game.fens[p - 1]), analyse(game.fens[p])]);
+  const k = classify(p, before, after);
+  classCache[key] = k; return k;
+}
+function refreshDots() {
+  for (let p = 1; p <= game.sans.length; p++) {
+    const k = classCache[game.meta.id + ":" + p], d = $("dot" + p);
+    if (d) d.style.background = k ? `var(${CLASSES[k][1]})` : "transparent";
+  }
+}
+function setEvalBar(r) {
+  if (!r) return;
+  const cp = Math.max(-1000, Math.min(1000, r.cp));
+  const pct = 50 + 50 * (2 / (1 + Math.exp(-cp / 250)) - 1);
+  const shown = flipped ? 100 - pct : pct;
+  $("evalFill").style.height = shown + "%";
+  $("evalFill").style.background = flipped ? "#2a2a2a" : "#f2f2ea";
+  $("evalbar").style.background = flipped ? "#f2f2ea" : "#2a2a2a";
+  const n = $("evalNum"); n.textContent = fmtEval(r);
+  const whiteBetter = r.cp >= 0;
+  const atBottom = flipped ? !whiteBetter : whiteBetter;
+  n.className = "num" + (atBottom ? "" : " top");
+  n.style.color = (whiteBetter ? "#444" : "#ddd");
+}
+
+// ---------- Kommentár panel ----------
+let token = 0;
+async function renderComment() {
+  const my = ++token;
+  const badge = $("badge"); badge.hidden = true;
+  $("aiOut").innerHTML = ""; $("aiNote").textContent = "";
+  const cbox = $("comment");
+  if (ply === 0) {
+    $("mvName").textContent = "Kiinduló állás";
+    cbox.className = "comment"; cbox.innerHTML = "";
+    const p = document.createElement("p"); p.textContent = game.meta.intro || "Lépj előre a ▶ gombbal vagy a jobbra nyíllal."; cbox.append(p);
+    $("engineLine").textContent = "";
+    $("aiBox").hidden = true;
+  } else {
+    const i = ply - 1;
+    $("mvName").textContent = `${Math.floor(i / 2) + 1}.${i % 2 ? "…" : " "}${huSan(game.sans[i])}`;
+    const txt = game.comments[i];
+    cbox.innerHTML = "";
+    if (txt) { cbox.className = "comment"; const p = document.createElement("p"); p.textContent = txt; cbox.append(p); }
+    else { cbox.className = "comment empty"; cbox.textContent = "Ehhez a lépéshez nincs előre megírt kommentár. Kérj részletes elemzést Claude-tól."; }
+    $("aiBox").hidden = !sampleFn;
+    const cached = store.get(aiKey());
+    if (cached) renderMd($("aiOut"), cached);
+  }
+  if (!engineReady) { $("engineLine").textContent = engine ? "Motor betöltése…" : ""; }
+  // motor (betöltés után a játszma újratöltődik, így ez az ág akkor fut le)
+  if (engineReady) {
+    $("engineLine").textContent = "Motor számol…";
+    const cur = await analyse(game.fens[ply]);
+    if (my !== token) return;
+    setEvalBar(cur);
+    drawArrow(cur.best);
+    let line = [];
+    if (ply > 0) {
+      const before = await analyse(game.fens[ply - 1]);
+      if (my !== token) return;
+      const k = await classifyPly(ply);
+      if (my !== token) return;
+      badge.textContent = CLASSES[k][0]; badge.style.background = `var(${CLASSES[k][1]})`; badge.hidden = false;
+      refreshDots();
+      if (k !== "best" && k !== "forced" && before.best) {
+        line.push(`Motor javaslata helyette: <b>${uciToHu(game.fens[ply - 1], [before.best])[0] || "–"}</b> (${fmtEval(before)})`);
+      }
+    }
+    line.push(`Értékelés: <b>${fmtEval(cur)}</b>`);
+    if (cur.best) line.push(`Legjobb folytatás: ${uciToHu(game.fens[ply], cur.pv.length ? cur.pv : [cur.best]).join(" ")}`);
+    $("engineLine").innerHTML = line.join(" · ");
+  }
+}
+
+// ---------- Claude elemzés (sample capability) ----------
+let sampleFn = null, aiCtl = null;
+const aiKey = () => `elemzes:v1:${game.meta.id}:${ply}`;
+function renderMd(el, text) {
+  el.innerHTML = "";
+  let ul = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) { ul = null; continue; }
+    let node;
+    if (/^#{1,4}\s/.test(line)) { ul = null; node = document.createElement("h4"); inline(node, line.replace(/^#+\s*/, "")); el.append(node); }
+    else if (/^[-*•]\s/.test(line)) { if (!ul) { ul = document.createElement("ul"); el.append(ul); } node = document.createElement("li"); inline(node, line.slice(2)); ul.append(node); }
+    else { ul = null; node = document.createElement("p"); inline(node, line); el.append(node); }
+  }
+}
+function inline(node, s) {
+  s.split(/(\*\*[^*]+\*\*)/).forEach(part => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) { const b = document.createElement("strong"); b.textContent = part.slice(2, -2); node.append(b); }
+    else node.append(document.createTextNode(part));
+  });
+}
+async function contextBlock() {
+  const i = ply - 1, m = game.meta;
+  const hist = game.sans.slice(0, ply).map((s, j) => (j % 2 === 0 ? (j / 2 + 1) + ". " : "") + huSan(s)).join(" ");
+  let eng = "Motoradat nem érhető el.";
+  if (engineReady) {
+    const before = await analyse(game.fens[ply - 1]), after = await analyse(game.fens[ply]);
+    const k = await classifyPly(ply);
+    eng = [
+      `A lépés előtti állás értékelése (világos szemszögéből): ${fmtEval(before)}; a motor legjobb lépése ott: ${uciToHu(game.fens[ply - 1], [before.best || ""])[0] || "–"}, fő változat: ${uciToHu(game.fens[ply - 1], before.pv).join(" ")}`,
+      `A lépés utáni értékelés: ${fmtEval(after)}; fő változat innen: ${uciToHu(game.fens[ply], after.pv).join(" ") || "–"}`,
+      `A motor besorolása: ${CLASSES[k][0]}`
+    ].join("\n");
+  }
+  return `Játszma: ${m.white} – ${m.black}${m.event ? ", " + m.event : ""}${m.year ? " " + m.year : ""}${m.opening ? ". Megnyitás: " + m.opening : ""}.
+Eddigi lépések (magyar jelöléssel: K=király, V=vezér, B=bástya, F=futó, H=huszár): ${hist}
+Az elemzett lépés: ${Math.floor(i / 2) + 1}. ${i % 2 ? "sötét" : "világos"} lépése: ${huSan(game.sans[i])}
+FEN a lépés után: ${game.fens[ply]}
+Stockfish adatok (mélység ${DEPTH}):
+${eng}
+${game.comments[i] ? "Rövid meglévő kommentár: " + game.comments[i] : ""}`;
+}
+async function runAi(question) {
+  if (!sampleFn || ply === 0) return;
+  aiCtl?.abort(); aiCtl = new AbortController();
+  const out = $("aiOut"), note = $("aiNote"), myPly = ply, key = aiKey();
+  $("aiBtn").disabled = true; $("askBtn").disabled = true; $("aiStop").hidden = false;
+  out.innerHTML = ""; note.textContent = "Claude gondolkodik… (5–60 másodperc)";
+  const ctx = await contextBlock();
+  const prompt = question
+    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 200 szó.
+
+${ctx}
+
+A kérdés: ${question}`
+    : `Sakkedző vagy, aki magyarul, részletesen és érthetően elemez egy lépést egy közepes szintű játékosnak (a chess.com egymondatos angol értékeléseinél sokkal alaposabban). Használj magyar figurajelölést (K=király, V=vezér, B=bástya, F=futó, H=huszár). A konkrét változatokat a megadott Stockfish-adatokra alapozd; ne találj ki szabálytalan vagy a motoradatoknak ellentmondó lépéseket. Ha a játékos lépése eltér a motor javaslatától, magyarázd el, miben jobb a javasolt lépés.
+
+Szerkezet (pontosan ezek a címsorok, '## ' előtaggal):
+## Mi történt?
+## Miért ezt lépte? (a lépés célja, terve)
+## Értékelés (jó vagy rossz lépés, és miért — a motoradatokra hivatkozva)
+## Fenyegetések és ellenlehetőségek
+## Tanulság
+
+Összesen kb. 200–300 szó, sima szöveg, felsorolásjel '- ' lehet, félkövér '**szöveg**' lehet.
+
+${ctx}`;
+  try {
+    const { text, truncated } = await sampleFn(prompt, {
+      signal: aiCtl.signal, modelTier: "default", cache: !question,
+      onText: ({ text }) => { if (ply === myPly) { note.textContent = ""; renderMd(out, text); } }
+    });
+    if (ply === myPly) renderMd(out, text);
+    if (!question) store.set(key, text);
+    if (truncated && ply === myPly) note.textContent = "A válasz túl hosszú volt, ezért levágódott.";
+  } catch (e) {
+    if (ply === myPly) {
+      if (e.text) renderMd(out, e.text);
+      const msg = { not_granted: "Az elemzéshez engedélyezned kell, hogy az oldal Claude-ot kérdezzen.", rate_limited: "Túl sok kérés egyszerre – várj egy percet, aztán próbáld újra.", cancelled: "Leállítva." };
+      note.textContent = msg[e.code] || ("Az elemzés nem sikerült (" + (e.code || "ismeretlen hiba") + ").");
+      if (e.code === "not_granted") { sampleFn = null; $("aiBox").hidden = true; }
+    }
+  } finally {
+    $("aiBtn").disabled = false; $("askBtn").disabled = false; $("aiStop").hidden = true;
+  }
+}
+
+// ---------- Navigáció ----------
+function go(p) {
+  p = Math.max(0, Math.min(game.sans.length, p));
+  if (p !== ply) aiCtl?.abort();
+  ply = p;
+  renderBoard(); markCurrent(); renderComment();
+  $("bStart").disabled = $("bPrev").disabled = ply === 0;
+  $("bEnd").disabled = $("bNext").disabled = ply === game.sans.length;
+  store.set("utolso", game.meta.id + ":" + ply);
+}
+function loadGame(meta, sans, startPly = 0) {
+  game = buildGame(meta, sans);
+  const m = game.meta;
+  const meta$ = $("meta"); meta$.innerHTML = "";
+  const parts = [["Világos", m.white], ["Sötét", m.black], ["Helyszín", [m.event, m.year].filter(Boolean).join(", ")], ["Megnyitás", m.opening], ["Eredmény", m.result]].filter(x => x[1]);
+  parts.forEach(([k, v], idx) => { const b = document.createElement("b"); b.textContent = v; meta$.append(k + ": ", b, idx < parts.length - 1 ? " · " : ""); });
+  ply = -1;
+  renderMoves(); go(startPly);
+  // háttérben az egész játszmát kiértékeli a lépésjelölésekhez
+  if (engineReady) game.fens.forEach(f => analyse(f).then(() => { for (let p = 1; p <= game.sans.length; p++) if (evalCache[game.fens[p - 1]] && evalCache[game.fens[p]]) classifyPly(p).then(refreshDots); }));
+}
+
+// ---------- PGN import ----------
+function cleanPgn(t) {
+  let s = t.replace(/\{[^}]*\}/g, " ").replace(/;[^\n]*/g, " ").replace(/\$\d+/g, " ");
+  let prev; do { prev = s; s = s.replace(/\([^()]*\)/g, " "); } while (s !== prev);
+  return s;
+}
+$("pgnLoad").onclick = () => {
+  const raw = $("pgnIn").value.trim(); $("pgnErr").textContent = "";
+  if (!raw) { $("pgnErr").textContent = "Illessz be egy PGN szöveget."; return; }
+  const ch = new Chess();
+  if (!ch.load_pgn(cleanPgn(raw), { sloppy: true })) { $("pgnErr").textContent = "Nem sikerült beolvasni. Ellenőrizd, hogy teljes PGN-t másoltál-e (fejléc + lépések)."; return; }
+  const h = ch.header(), sans = ch.history();
+  if (!sans.length) { $("pgnErr").textContent = "A PGN nem tartalmaz lépéseket."; return; }
+  const meta = { id: "pgn-" + hash(sans.join(" ")), title: `${h.White || "Világos"} – ${h.Black || "Sötét"}`, white: h.White, black: h.Black, event: [h.Event, h.Site].filter(x => x && x !== "?").join(", "), year: (h.Date || "").slice(0, 4).replace(/\?/g, ""), result: h.Result, opening: h.Opening || h.ECO, intro: "Saját betöltött játszma. Lépj előre, és kérj részletes magyar elemzést bármelyik lépéshez.", c: {} };
+  let opt = [...$("gameSel").options].find(o => o.value === meta.id);
+  if (!opt) { opt = new Option(meta.title + (meta.year ? ` (${meta.year})` : ""), meta.id); $("gameSel").add(opt); }
+  imported[meta.id] = { meta, sans };
+  store.set("pgn:" + meta.id, raw);
+  $("gameSel").value = meta.id;
+  loadGame(meta, sans);
+  $("importBox").open = false;
+};
+const imported = {};
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); }
+
+// ---------- Indítás ----------
+const sel = $("gameSel");
+GAMES.forEach(g => sel.add(new Option(`${g.title} – ${g.white} vs. ${g.black.split(" és ")[0]} (${g.year})`, g.id)));
+sel.onchange = () => {
+  const g = GAMES.find(x => x.id === sel.value);
+  if (g) loadGame(g, g.moves.split(" ")); else if (imported[sel.value]) loadGame(imported[sel.value].meta, imported[sel.value].sans);
+};
+$("bStart").onclick = () => go(0);
+$("bPrev").onclick = () => go(ply - 1);
+$("bNext").onclick = () => go(ply + 1);
+$("bEnd").onclick = () => go(game.sans.length);
+$("bFlip").onclick = () => { flipped = !flipped; renderBoard(); if (evalCache[game.fens[ply]]) { setEvalBar(evalCache[game.fens[ply]]); drawArrow(evalCache[game.fens[ply]].best); } };
+$("aiBtn").onclick = () => runAi();
+$("aiStop").onclick = () => aiCtl?.abort();
+$("askForm").addEventListener("submit", e => { e.preventDefault(); const q = $("askInput").value.trim(); if (q) runAi(q); });
+document.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+  if (e.key === "ArrowRight") { go(ply + 1); e.preventDefault(); }
+  else if (e.key === "ArrowLeft") { go(ply - 1); e.preventDefault(); }
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(game.sans.length);
+});
+
+let start = GAMES[0], startPly = 10;
+const last = store.get("utolso");
+if (last) { const [id, p] = last.split(":"); const g = GAMES.find(x => x.id === id); if (g) { start = g; startPly = +p || 0; } }
+sel.value = start.id;
+loadGame(start, start.moves.split(" "), startPly);
+
+const _ready = setInterval(() => { if (engineReady && game) { clearInterval(_ready); loadGame(game.meta, game.sans, ply); } }, 300);
+initEngine();
+
+(async () => {
+  try { sampleFn = window.claude ? await window.claude.use("sample") : null; } catch { sampleFn = null; }
+  if (sampleFn && ply > 0) $("aiBox").hidden = false;
+  if (!sampleFn) $("aiNote").textContent = "";
+})();
+</script>
+
+</body></html>
