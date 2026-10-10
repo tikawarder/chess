@@ -173,8 +173,9 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
         <div class="comment" id="comment"></div>
         <div class="ai" id="aiBox" hidden>
           <div class="ai-actions">
-            <button class="primary" id="aiBtn">Részletes elemzés Claude-dal</button>
+            <button class="primary" id="aiBtn">Részletes elemzés AI-val</button>
             <button id="aiStop" hidden>Leállítás</button>
+            <button id="speakBtn" hidden title="Felolvasás magyarul">🔊 Felolvasás</button>
             <span class="ai-note" id="aiNote"></span>
           </div>
           <div class="ai-out" id="aiOut"></div>
@@ -597,7 +598,7 @@ let token = 0;
 async function renderComment() {
   const my = ++token;
   const badge = $("badge"); badge.hidden = true;
-  $("aiOut").innerHTML = ""; $("aiNote").textContent = "";
+  $("aiOut").innerHTML = ""; $("aiNote").textContent = ""; $("speakBtn").hidden = true; stopSpeech();
   const cbox = $("comment");
   if (ply === 0) {
     $("mvName").textContent = "Kiinduló állás";
@@ -611,7 +612,7 @@ async function renderComment() {
     const txt = game.comments[i];
     cbox.innerHTML = "";
     if (txt) { cbox.className = "comment"; const p = document.createElement("p"); p.textContent = txt; cbox.append(p); }
-    else { cbox.className = "comment empty"; cbox.textContent = "Ehhez a lépéshez nincs előre megírt kommentár. Kérj részletes elemzést Claude-tól."; }
+    else { cbox.className = "comment empty"; cbox.textContent = "Ehhez a lépéshez nincs előre megírt kommentár. Kérj részletes elemzést az AI-tól."; }
     $("aiBox").hidden = !sampleFn;
     const cached = store.get(aiKey());
     if (cached) renderMd($("aiOut"), cached);
@@ -644,9 +645,10 @@ async function renderComment() {
 
 // ---------- Claude elemzés (sample capability) ----------
 let sampleFn = null, aiCtl = null;
-const aiKey = () => `elemzes:v1:${game.meta.id}:${ply}`;
+const aiKey = () => `elemzes:v3:${game.meta.id}:${ply}`;
 function renderMd(el, text) {
   el.innerHTML = "";
+  if (el.id === "aiOut") $("speakBtn").hidden = !text.trim();
   let ul = null;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
@@ -689,24 +691,19 @@ async function runAi(question) {
   aiCtl?.abort(); aiCtl = new AbortController();
   const out = $("aiOut"), note = $("aiNote"), myPly = ply, key = aiKey();
   $("aiBtn").disabled = true; $("askBtn").disabled = true; $("aiStop").hidden = false;
-  out.innerHTML = ""; note.textContent = "Claude gondolkodik… (5–60 másodperc)";
+  out.innerHTML = ""; note.textContent = "Az AI gondolkodik… (5–60 másodperc)";
   const ctx = await contextBlock();
   const prompt = question
-    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 200 szó.
+    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 80 szó, szórakoztató hangon.
 
 ${ctx}
 
 A kérdés: ${question}`
-    : `Sakkedző vagy, aki magyarul, részletesen és érthetően elemez egy lépést egy közepes szintű játékosnak (a chess.com egymondatos angol értékeléseinél sokkal alaposabban). Használj magyar figurajelölést (K=király, V=vezér, B=bástya, F=futó, H=huszár). A konkrét változatokat a megadott Stockfish-adatokra alapozd; ne találj ki szabálytalan vagy a motoradatoknak ellentmondó lépéseket. Ha a játékos lépése eltér a motor javaslatától, magyarázd el, miben jobb a javasolt lépés.
-
-Szerkezet (pontosan ezek a címsorok, '## ' előtaggal):
-## Mi történt?
-## Miért ezt lépte? (a lépés célja, terve)
-## Értékelés (jó vagy rossz lépés, és miért — a motoradatokra hivatkozva)
-## Fenyegetések és ellenlehetőségek
-## Tanulság
-
-Összesen kb. 200–300 szó, sima szöveg, felsorolásjel '- ' lehet, félkövér '**szöveg**' lehet.
+    : `Sakkedző vagy: vidám, szórakoztató, de szakmailag pontos. Magyarul beszélj, magyar figurajelöléssel (K=király, V=vezér, B=bástya, F=futó, H=huszár). Köszönés és bevezető nélkül, rögtön a címsorokkal. Pontosan három rövid szakasz, '## ' címsorral, összesen legfeljebb 90 szó:
+## Mi történt? (1–2 mondat)
+## Miért jó vagy rossz? (2 mondat, a motoradatokra hivatkozva; ha a motor mást javasol, mondd meg, miért jobb)
+## Mi jön most? (1–2 mondat: a legvalószínűbb folytatás és terv)
+Csak azt állítsd, ami a megadott lépésekből, a FEN-ből és a motoradatokból következik; gyalogszerkezetről, tervekről ne találj ki állításokat, szabálytalan lépést se írj. Egy kis humor vagy hasonlat belefér. A lépésről beszélj, ne tegezd a játékost.
 
 ${ctx}`;
   try {
@@ -729,10 +726,26 @@ ${ctx}`;
   }
 }
 
+// ---------- Felolvasás (böngésző beépített beszédszintézise, magyar hang) ----------
+function stopSpeech() { try { speechSynthesis.cancel(); } catch {} const b = $("speakBtn"); if (b) b.textContent = "🔊 Felolvasás"; }
+function speechText(t) {
+  return t.replace(/O-O-O/g, "hosszú sánc").replace(/O-O/g, "rövid sánc").replace(/\+/g, " sakk").replace(/#/g, " matt")
+    .replace(/(\d+)\.\s*(\.\.)?/g, "$1. lépés ").replace(/\s+/g, " ");
+}
+$("speakBtn").addEventListener("click", () => {
+  if (!("speechSynthesis" in window)) { $("aiNote").textContent = "A böngésző nem támogatja a felolvasást."; return; }
+  if (speechSynthesis.speaking) { stopSpeech(); return; }
+  const u = new SpeechSynthesisUtterance(speechText($("aiOut").innerText));
+  const hu = speechSynthesis.getVoices().find(v => /^hu/i.test(v.lang));
+  u.lang = "hu-HU"; if (hu) u.voice = hu; else $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
+  u.onend = u.onerror = () => stopSpeech();
+  $("speakBtn").textContent = "⏹ Leállítás"; speechSynthesis.speak(u);
+});
+
 // ---------- Navigáció ----------
 function go(p) {
   p = Math.max(0, Math.min(game.sans.length, p));
-  if (p !== ply) aiCtl?.abort();
+  if (p !== ply) { aiCtl?.abort(); stopSpeech(); }
   ply = p;
   renderBoard(); markCurrent(); renderComment();
   $("bStart").disabled = $("bPrev").disabled = ply === 0;
@@ -810,6 +823,19 @@ initEngine();
 
 (async () => {
   try { sampleFn = window.claude ? await window.claude.use("sample") : null; } catch { sampleFn = null; }
+  // Önálló futás: a server.js proxyn át Gemini (a kulcs a szerveren marad)
+  if (!sampleFn) {
+    try {
+      const st = await (await fetch("/api/status")).json();
+      if (st.ai) sampleFn = async (prompt, { signal, onText } = {}) => {
+        const r = await fetch("/api/analyze", { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+        if (!r.ok) throw { code: r.status === 429 ? "rate_limited" : "http_" + r.status };
+        const out = await r.json();
+        onText?.({ text: out.text });
+        return out;
+      };
+    } catch { /* nincs proxy (pl. file:// vagy statikus hosting) */ }
+  }
   if (sampleFn && ply > 0) $("aiBox").hidden = false;
   if (!sampleFn) $("aiNote").textContent = "";
 })();
