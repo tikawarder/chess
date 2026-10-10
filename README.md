@@ -43,7 +43,7 @@ Amíg nincs beállító felület, minden nem titkos beállítás a `settings.pro
 | `ai.model`, `ai.temperature`, `ai.maxOutputTokens`, `ai.thinkingBudget` | gemini-2.5-flash, 0.7, 1024, 0 | A Gemini hívás paraméterei |
 | `ai.maxWords` | 90 | Az elemzés kért hossza (hogy kiférjen az oldalra) |
 | `replay.autoStart`, `replay.stepSeconds`, `replay.loop` | true, 3, true | Az elemzett lépések automatikus, ismétlődő lejátszása a táblán, piros kiemeléssel |
-| `speech.lang`, `speech.rate` | hu-HU, 1 | Felolvasás |
+| `speech.autoStart`, `speech.lang`, `speech.rate` | false, hu-HU, 1 | Felolvasás; közben a kimondott lépés szinkronban, pirosan jelenik meg a táblán (a szöveg lépésenként szeletelve szól, így nem függ a böngésző szóhatár-eseményeitől) |
 | `animation.enabled`, `animation.ms` | true, 900 | A bábuk lassú odacsúszása, ütésnél az ütött bábu elhalványul; kézi léptetésnél, PGN-lejátszásnál és AI-lejátszásnál is ugyanaz |
 | `play.stepSeconds` | 3 | A ⏵ Játszma gombbal indított PGN-lejátszás lépésköze (sárga kiemelés; az AI-lejátszásé piros) |
 

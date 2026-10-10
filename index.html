@@ -365,7 +365,7 @@ const store = {
 };
 
 // settings.properties tartalma (a szerver /api/settings adja); statikus hostingon az alapértékek érvényesek
-const CFG = { "ai.maxWords": 90, "replay.autoStart": true, "replay.stepSeconds": 3, "replay.loop": true, "speech.lang": "hu-HU", "speech.rate": 1, "animation.enabled": true, "animation.ms": 900, "play.stepSeconds": 3 };
+const CFG = { "ai.maxWords": 90, "replay.autoStart": true, "replay.stepSeconds": 3, "replay.loop": true, "speech.lang": "hu-HU", "speech.rate": 1, "speech.autoStart": false, "animation.enabled": true, "animation.ms": 900, "play.stepSeconds": 3 };
 let game = null;        // { meta, sans[], fens[], comments{} }
 let ply = 0;            // hány lépés történt meg (0 = kiinduló állás)
 let flipped = false;
@@ -672,7 +672,7 @@ async function renderComment() {
 
 // ---------- Claude elemzés (sample capability) ----------
 let sampleFn = null, aiCtl = null;
-const aiKey = () => `elemzes:v4:${game.meta.id}:${ply}`;
+const aiKey = () => `elemzes:v5:${game.meta.id}:${ply}`;
 function renderMd(el, text) {
   el.innerHTML = "";
   if (el.id === "aiOut") $("speakBtn").hidden = $("replayBtn").hidden = !text.trim();
@@ -727,16 +727,16 @@ async function runAi(question) {
   out.innerHTML = ""; note.textContent = "Az AI gondolkodik… (5–60 másodperc)";
   const ctx = await contextBlock();
   const prompt = question
-    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 80 szó, szórakoztató hangon.
+    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 80 szó, szórakoztató hangon; számot (értékelést) és a „motor”/„Stockfish” szót ne említs, az állást szavakkal értékeld.
 
 ${ctx}
 
 A kérdés: ${question}`
     : `Sakkedző vagy: vidám, szórakoztató, de szakmailag pontos. Magyarul beszélj, magyar figurajelöléssel (K=király, V=vezér, B=bástya, F=futó, H=huszár). Köszönés és bevezető nélkül, rögtön a címsorokkal. Pontosan három rövid szakasz, '## ' címsorral, összesen legfeljebb ${CFG["ai.maxWords"]} szó:
 ## Mi történt? (1–2 mondat)
-## Miért jó vagy rossz? (2 mondat, a motoradatokra hivatkozva; ha a motor mást javasol, mondd meg, miért jobb)
+## Miért jó vagy rossz? (2 mondat; ha a legjobb lépés más, mondd meg, miért jobb)
 ## Mi jön most? (1–2 mondat: a legvalószínűbb folytatás és terv)
-Csak azt állítsd, ami a megadott lépésekből, a FEN-ből és a motoradatokból következik; gyalogszerkezetről, tervekről ne találj ki állításokat, szabálytalan lépést se írj. Egy kis humor vagy hasonlat belefér. A lépésről beszélj, ne tegezd a játékost.
+FONTOS: számot (értékelést, centigyalogot, mélységet) és a „motor”/„Stockfish” szót soha ne írd le, ne beszélj számításról; az értékelést élvezetes hétköznapi nyelven mondd el (pl. „kiegyenlített”, „világos érezhetően jobban áll”, „ez egy gyalogba kerül”), a javasolt lépést pedig „a legjobb lépés”-nek hívd. Csak azt állítsd, ami a megadott lépésekből, a FEN-ből és a motoradatokból következik; gyalogszerkezetről, tervekről ne találj ki állításokat, szabálytalan lépést se írj. Egy kis humor vagy hasonlat belefér. A lépésről beszélj, ne tegezd a játékost.
 
 ${ctx}`;
   try {
@@ -746,7 +746,7 @@ ${ctx}`;
     });
     const { text, truncated } = res;
     showUsage(res.usage);
-    if (ply === myPly) { renderMd(out, text); if (CFG["replay.autoStart"]) startReplay(); } // kész az elemzés: az elemzett lépések automatikus lejátszása
+    if (ply === myPly) { renderMd(out, text); if (CFG["speech.autoStart"]) startSpeech(); else if (CFG["replay.autoStart"]) startReplay(); } // kész az elemzés: az elemzett lépések automatikus lejátszása
     if (!question) store.set(key, text);
     if (truncated && ply === myPly) note.textContent = "A válasz túl hosszú volt, ezért levágódott.";
   } catch (e) {
@@ -815,35 +815,41 @@ function sayMove(mk) {
   drawArrow(mk.from + mk.to, true); // a kimondott/elemzett lépés piros nyíllal
   animateMove(mk.from, mk.to, captured, Number(CFG["animation.ms"]) || 900);
 }
-let sayTimers = [];
+// Felolvasás lépésekre szeletelve: minden lépés a rá következő szöveggel külön felolvasás, és az indulásakor jelenik meg
+// a piros lépés a táblán. Így a szinkron nem függ a böngésző szóhatár-eseményeitől (amiket sok hang nem küld).
+let speechRun = 0, speechOn = false; // speechRun: a régi felolvasás eseménykezelői ne zavarják az újat
 function stopSpeech(restore = true) {
+  speechRun++; speechOn = false;
   try { speechSynthesis.cancel(); } catch {}
-  sayTimers.forEach(clearTimeout); sayTimers = [];
-  if (restore) sayMove(null);
+  if (restore) sayMove(null); // vissza az eredeti állásra
   const b = $("speakBtn"); if (b) b.textContent = "🔊 Felolvasás";
 }
-$("speakBtn").addEventListener("click", () => {
+function startSpeech() {
   if (!("speechSynthesis" in window)) { $("aiNote").textContent = "A böngésző nem támogatja a felolvasást."; return; }
-  if (speechSynthesis.speaking) { stopSpeech(); return; }
-  stopReplay(false);
-  const sp = buildSpeech($("aiOut").innerText, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]);
-  const u = new SpeechSynthesisUtterance(sp.text);
-  const hu = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(String(CFG["speech.lang"]).slice(0, 2).toLowerCase()));
-  u.lang = CFG["speech.lang"]; u.rate = Number(CFG["speech.rate"]) || 1; if (hu) u.voice = hu; else $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
-  let gotBoundary = false;
-  u.onboundary = e => { gotBoundary = true; const m = sp.marks.find(m => e.charIndex >= m.start && e.charIndex < m.end); if (m) sayMove(m); };
-  u.onstart = () => {
-    // egyes (hálózati) hangok nem küldenek szóhatár-eseményt: ilyenkor becsült időzítés (~14 karakter/mp)
-    sayTimers.push(setTimeout(() => {
-      if (gotBoundary) return;
-      for (const m of sp.marks) {
-        sayTimers.push(setTimeout(() => sayMove(m), m.start / 14 * 1000));
-      }
-    }, 1200));
-  };
-  u.onend = u.onerror = () => stopSpeech();
-  $("speakBtn").textContent = "⏹ Leállítás"; speechSynthesis.speak(u);
-});
+  const text = $("aiOut").innerText; if (!text.trim()) return;
+  stopReplay(false); stopAutoplay(); stopSpeech(false);
+  const run = ++speechRun; speechOn = true;
+  const sp = buildSpeech(text, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]);
+  const cuts = [0, ...sp.marks.map(m => m.start), sp.text.length];
+  const segs = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const t = sp.text.slice(cuts[i], cuts[i + 1]);
+    if (t.trim()) segs.push({ text: t, mark: i >= 1 ? sp.marks[i - 1] : null });
+  }
+  const lang = String(CFG["speech.lang"]);
+  const voice = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+  if (!voice) $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
+  $("speakBtn").textContent = "⏹ Leállítás";
+  segs.forEach((g, i) => {
+    const u = new SpeechSynthesisUtterance(g.text);
+    u.lang = lang; u.rate = Number(CFG["speech.rate"]) || 1; if (voice) u.voice = voice;
+    u.onstart = () => { if (run === speechRun && g.mark) sayMove(g.mark); };
+    u.onerror = () => { if (run === speechRun) stopSpeech(); };
+    if (i === segs.length - 1) u.onend = () => { if (run === speechRun) stopSpeech(); }; // a végén vissza az eredeti állásra
+    speechSynthesis.speak(u);
+  });
+}
+$("speakBtn").addEventListener("click", () => { if (speechOn) stopSpeech(); else startSpeech(); });
 
 // ---------- Elemzett lépések lejátszása (alternatív változat, piros kiemeléssel) ----------
 const stepMs = () => (Number(CFG["replay.stepSeconds"]) || 3) * 1000;
