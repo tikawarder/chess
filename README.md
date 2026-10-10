@@ -34,6 +34,21 @@ node --test               # tesztek (hamis Gemini-szerverrel, kulcs nélkül)
 
 Kulcs nélkül az AI-gomb rejtve marad, minden más működik. Kulcs: https://aistudio.google.com/apikey
 
+### Beállítások: `settings.properties`
+
+Amíg nincs beállító felület, minden nem titkos beállítás a `settings.properties` fájlban van (kulcs=érték). A szerver minden kérésnél újraolvassa, a böngészőben F5 után lép életbe. API-kulcs ide **ne** kerüljön, az az `.env`-be megy.
+
+| Kulcs | Alap | Jelentés |
+|---|---|---|
+| `ai.model`, `ai.temperature`, `ai.maxOutputTokens`, `ai.thinkingBudget` | gemini-2.5-flash, 0.7, 1024, 0 | A Gemini hívás paraméterei |
+| `ai.maxWords` | 90 | Az elemzés kért hossza (hogy kiférjen az oldalra) |
+| `replay.autoStart`, `replay.stepSeconds`, `replay.loop` | true, 3, true | Az elemzett lépések automatikus, ismétlődő lejátszása a táblán, piros kiemeléssel |
+| `speech.lang`, `speech.rate` | hu-HU, 1 | Felolvasás |
+| `animation.enabled`, `animation.ms` | true, 900 | A bábuk lassú odacsúszása, ütésnél az ütött bábu elhalványul; kézi léptetésnél, PGN-lejátszásnál és AI-lejátszásnál is ugyanaz |
+| `play.stepSeconds` | 3 | A ⏵ Játszma gombbal indított PGN-lejátszás lépésköze (sárga kiemelés; az AI-lejátszásé piros) |
+
+Az AI-elemzés kész szövegéből a program kiszedi a lépéseket, és a ▶ (tovább) gombig vagy a ⏹ gombig ismétlődve lejátssza őket, majd visszaáll az eredeti állás.
+
 ## Ismert korlátok
 
 - Az AI-elemzés önállóan csak a `server.js` proxyn át (Gemini) működik; claude.ai artifactként továbbra is a Claude-ot használja. Statikus tárhelyen (pl. GitHub Pages) a gomb nem jelenik meg.

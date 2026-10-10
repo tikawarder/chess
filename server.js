@@ -17,6 +17,40 @@ function loadEnv(file = path.join(__dirname, ".env")) {
   }
 }
 
+// settings.properties: kulcs=érték sorok, # megjegyzés; a true/false és a számok típusosan jönnek vissza
+function parseProperties(txt) {
+  const o = {};
+  for (const line of txt.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t[0] === "#" || t[0] === "!") continue;
+    const i = t.search(/[=:]/);
+    if (i < 1) continue;
+    const k = t.slice(0, i).trim(); let v = t.slice(i + 1).trim();
+    if (/^(true|false)$/i.test(v)) v = v.toLowerCase() === "true";
+    else if (v !== "" && !isNaN(Number(v))) v = Number(v);
+    o[k] = v;
+  }
+  return o;
+}
+function loadSettings(file) { try { return parseProperties(fs.readFileSync(file, "utf8")); } catch { return {}; } }
+
+// Költség USD-ben: tokenek × ár / 1 millió (az árak a settings.properties-ben állíthatók; ingyenes szinten 0)
+function costOf(u, st) {
+  const pi = Number(st["ai.price.inputPerMTok"]) || 0, po = Number(st["ai.price.outputPerMTok"]) || 0;
+  return ((u.prompt || 0) * pi + (u.output || 0) * po) / 1e6;
+}
+function logUsage(file, rec) { if (file) try { fs.appendFileSync(file, JSON.stringify(rec) + "\n"); } catch { /* a napló nem kritikus */ } }
+function totalUsage(file) {
+  const t = { calls: 0, prompt: 0, output: 0, cost: 0, since: null };
+  if (!file) return t;
+  let txt = ""; try { txt = fs.readFileSync(file, "utf8"); } catch { return t; }
+  for (const line of txt.split(/\r?\n/)) {
+    if (!line) continue;
+    try { const r = JSON.parse(line); t.calls++; t.prompt += r.prompt; t.output += r.output; t.cost += r.cost; t.since ??= r.ts; } catch { /* sérült sor kihagyva */ }
+  }
+  return t;
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0, over = false; const chunks = [];
@@ -36,7 +70,7 @@ function send(res, status, obj) {
 }
 
 // Gemini generateContent hívás; a fetch és az URL injektálható a teszthez
-async function askGemini(prompt, { apiKey, model, baseUrl, fetchImpl, signal }) {
+async function askGemini(prompt, { apiKey, model, baseUrl, fetchImpl, signal, temperature = 0.7, maxOutputTokens = 1024, thinkingBudget = 0 }) {
   const url = `${baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
   const r = await fetchImpl(url, {
     method: "POST",
@@ -44,7 +78,7 @@ async function askGemini(prompt, { apiKey, model, baseUrl, fetchImpl, signal }) 
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       // thinkingBudget 0: a „gondolkodás” ne egye el a válasz tokenkeretét (gemini-2.5-flash)
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: { temperature, maxOutputTokens, thinkingConfig: { thinkingBudget } }
     }),
     signal
   });
@@ -54,17 +88,20 @@ async function askGemini(prompt, { apiKey, model, baseUrl, fetchImpl, signal }) 
   const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
   if (!text) throw Object.assign(new Error("empty"), { status: 502 });
   const u = data.usageMetadata || {};
-  return { text, truncated: cand.finishReason === "MAX_TOKENS", usage: { prompt: u.promptTokenCount, output: u.candidatesTokenCount, total: u.totalTokenCount } };
+  const output = (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0); // a gondolkodási token is kimenetként számít
+  return { text, truncated: cand.finishReason === "MAX_TOKENS", usage: { prompt: u.promptTokenCount || 0, output, total: u.totalTokenCount || 0 } };
 }
 
 function createServer(opts = {}) {
   const cfg = {
     apiKey: opts.apiKey ?? process.env.GEMINI_API_KEY,
-    model: opts.model ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    model: opts.model, // ha nincs megadva: GEMINI_MODEL env, majd settings.properties
     baseUrl: opts.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta",
     fetchImpl: opts.fetchImpl ?? fetch
   };
   const indexHtml = path.join(__dirname, "index.html");
+  const usageFile = opts.usageFile === undefined ? path.join(__dirname, "usage.jsonl") : opts.usageFile; // null = nincs napló
+  const settingsFile = opts.settingsFile ?? path.join(__dirname, "settings.properties");
 
   return http.createServer(async (req, res) => {
     try {
@@ -73,6 +110,10 @@ function createServer(opts = {}) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         return fs.createReadStream(indexHtml).pipe(res);
       }
+      if (req.method === "GET" && url.pathname === "/api/settings") {
+        return send(res, 200, loadSettings(settingsFile)); // nem titkos beállítások a böngészőnek
+      }
+      if (req.method === "GET" && url.pathname === "/api/usage") return send(res, 200, totalUsage(usageFile));
       if (req.method === "GET" && url.pathname === "/api/status") {
         return send(res, 200, { ai: Boolean(cfg.apiKey), provider: "gemini" });
       }
@@ -85,7 +126,14 @@ function createServer(opts = {}) {
         if (typeof prompt !== "string" || !prompt.trim()) return send(res, 400, { error: "bad_prompt" });
         const ctl = new AbortController();
         res.on("close", () => { if (!res.writableEnded) ctl.abort(); }); // a kliens megszakította
-        const out = await askGemini(prompt, { ...cfg, signal: ctl.signal });
+        const st = loadSettings(settingsFile);
+        const out = await askGemini(prompt, {
+          ...cfg, signal: ctl.signal,
+          model: cfg.model ?? process.env.GEMINI_MODEL ?? st["ai.model"] ?? "gemini-2.5-flash",
+          temperature: st["ai.temperature"], maxOutputTokens: st["ai.maxOutputTokens"], thinkingBudget: st["ai.thinkingBudget"]
+        });
+        out.usage.cost = costOf(out.usage, st);
+        logUsage(usageFile, { ts: new Date().toISOString(), model: cfg.model ?? process.env.GEMINI_MODEL ?? st["ai.model"] ?? "gemini-2.5-flash", ...out.usage });
         return send(res, 200, out);
       }
       send(res, 404, { error: "not_found" });
@@ -95,7 +143,7 @@ function createServer(opts = {}) {
   });
 }
 
-module.exports = { createServer, askGemini, loadEnv };
+module.exports = { createServer, askGemini, loadEnv, parseProperties };
 
 if (require.main === module) {
   loadEnv();

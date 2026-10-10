@@ -58,11 +58,14 @@ h1 span { color: var(--accent); }
 .sq { position: relative; display: flex; align-items: center; justify-content: center; container-type: size; }
 .sq.l { background: var(--sq-light); } .sq.d { background: var(--sq-dark); }
 .sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--hl); }
+.sq.say-from::after, .sq.say-to::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(225, 50, 50, .40); }
+.sq.say-to::after { background: rgba(225, 50, 50, .65); box-shadow: inset 0 0 0 3px rgba(180, 20, 20, .95); }
 .sq .coord { position: absolute; font: 600 clamp(8px, 1.4cqw + 6px, 12px)/1 var(--font-mono); opacity: .75; pointer-events: none; }
 .sq.l .coord { color: var(--sq-dark); } .sq.d .coord { color: var(--sq-light); }
 .sq .coord.f { right: 3px; bottom: 2px; } .sq .coord.r { left: 3px; top: 3px; }
 .pc { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", "Arial Unicode MS", serif; font-size: 78cqh; line-height: 1; }
 .pc span { position: absolute; }
+.pc.ghost { position: absolute; inset: 0; pointer-events: none; }
 .pc .fillw { color: #fbfbf5; } .pc .outl { color: #1b1b1b; }
 .pc .fillb { color: #161616; text-shadow: 0 0 1px rgba(255,255,255,.35); }
 .arrows { position: absolute; inset: 0; pointer-events: none; }
@@ -139,7 +142,7 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
         <div class="board-wrap">
           <div class="board" id="board"></div>
           <svg class="arrows" id="arrows" viewBox="0 0 800 800" aria-hidden="true">
-            <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--arrow)"/></marker></defs>
+            <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--arrow)"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="rgba(215,40,40,.9)"/></marker></defs>
             <g id="arrowG"></g>
           </svg>
         </div>
@@ -150,6 +153,7 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
         <button id="bPrev" aria-label="Vissza">◀</button>
         <button id="bNext" aria-label="Előre">▶</button>
         <button id="bEnd" aria-label="Végére">▶|</button>
+        <button id="bPlay" class="flip" title="A játszma automatikus lejátszása">⏵ Játszma</button>
         <button id="bFlip" class="flip">Tábla forgatása</button>
       </div>
       <div class="engine-status" id="engineStatus">Stockfish motor betöltése…</div>
@@ -175,8 +179,10 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
           <div class="ai-actions">
             <button class="primary" id="aiBtn">Részletes elemzés AI-val</button>
             <button id="aiStop" hidden>Leállítás</button>
+            <button id="replayBtn" hidden title="Az elemzett lépések lejátszása a táblán">▶ Lejátszás</button>
             <button id="speakBtn" hidden title="Felolvasás magyarul">🔊 Felolvasás</button>
             <span class="ai-note" id="aiNote"></span>
+            <span class="ai-note" id="aiUsage" title="Tokenek és becsült költség (settings.properties árak szerint)"></span>
           </div>
           <div class="ai-out" id="aiOut"></div>
           <form class="ask" id="askForm">
@@ -358,6 +364,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
 };
 
+// settings.properties tartalma (a szerver /api/settings adja); statikus hostingon az alapértékek érvényesek
+const CFG = { "ai.maxWords": 90, "replay.autoStart": true, "replay.stepSeconds": 3, "replay.loop": true, "speech.lang": "hu-HU", "speech.rate": 1, "animation.enabled": true, "animation.ms": 900, "play.stepSeconds": 3 };
 let game = null;        // { meta, sans[], fens[], comments{} }
 let ply = 0;            // hány lépés történt meg (0 = kiinduló állás)
 let flipped = false;
@@ -381,10 +389,11 @@ function parseFen(fen) {
 function sqName(r, f) { return "abcdefgh"[f] + (8 - r); }
 function sqXY(name) { const f = name.charCodeAt(0) - 97, r = 8 - +name[1]; return flipped ? [7 - f, 7 - r] : [f, r]; }
 
-function renderBoard() {
+function renderBoard(fenOverride) {
+  if (!fenOverride) sayShown = null;
   const b = $("board");
-  const grid = parseFen(game.fens[ply]);
-  const last = ply > 0 ? lastMoveSquares(ply) : [];
+  const grid = parseFen(fenOverride || game.fens[ply]);
+  const last = !fenOverride && ply > 0 ? lastMoveSquares(ply) : [];
   b.innerHTML = "";
   for (let vr = 0; vr < 8; vr++) for (let vf = 0; vf < 8; vf++) {
     const r = flipped ? 7 - vr : vr, f = flipped ? 7 - vf : vf;
@@ -418,13 +427,31 @@ function renderBoard() {
   }
   drawArrow(null);
 }
+// Lassú odacsúszás: az új állásban lévő bábut a kiinduló mezőről csúsztatjuk a helyére, az ütött bábu elhalványul
+function pieceHtmlAt(name) { const [x, y] = sqXY(name); return $("board").children[y * 8 + x]?.querySelector(".pc")?.innerHTML || ""; }
+function animateMove(from, to, capturedHtml, ms) {
+  if (!CFG["animation.enabled"]) return;
+  const cells = $("board").children, [fx, fy] = sqXY(from), [tx, ty] = sqXY(to);
+  const fromCell = cells[fy * 8 + fx], toCell = cells[ty * 8 + tx], pc = toCell?.querySelector(".pc:not(.ghost)");
+  if (!pc || !fromCell) return;
+  const a = fromCell.getBoundingClientRect(), b = toCell.getBoundingClientRect();
+  Object.assign(pc.style, { transition: "none", transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)`, zIndex: 5 });
+  void pc.offsetWidth; // a kiinduló helyzet érvényesüljön az átmenet előtt
+  Object.assign(pc.style, { transition: `transform ${ms}ms ease-in-out`, transform: "translate(0, 0)" });
+  setTimeout(() => { pc.style.transition = pc.style.transform = pc.style.zIndex = ""; }, ms + 60);
+  if (capturedHtml) {
+    const g = document.createElement("div"); g.className = "pc ghost"; g.innerHTML = capturedHtml; toCell.append(g);
+    g.style.transition = `opacity ${ms}ms ease-in`; requestAnimationFrame(() => requestAnimationFrame(() => { g.style.opacity = "0"; }));
+    setTimeout(() => g.remove(), ms + 60);
+  }
+}
 const lastMoveCache = {};
 function lastMoveSquares(p) {
   const key = game.meta.id + ":" + p;
   if (!lastMoveCache[key]) { const ch = new Chess(game.fens[p - 1]); const m = ch.move(game.sans[p - 1]); lastMoveCache[key] = m ? [m.from, m.to] : []; }
   return lastMoveCache[key];
 }
-function drawArrow(uci) {
+function drawArrow(uci, red = false) { // red: az AI-elemzés lépése (piros), különben a motor javaslata (zöld)
   const g = $("arrowG"); g.innerHTML = "";
   if (!uci) return;
   const [fx, fy] = sqXY(uci.slice(0, 2)), [tx, ty] = sqXY(uci.slice(2, 4));
@@ -433,8 +460,8 @@ function drawArrow(uci) {
   const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
   l.setAttribute("x1", c(fx)); l.setAttribute("y1", c(fy));
   l.setAttribute("x2", c(tx) - dx / len * sh); l.setAttribute("y2", c(ty) - dy / len * sh);
-  l.setAttribute("stroke", "var(--arrow)"); l.setAttribute("stroke-width", "16"); l.setAttribute("stroke-linecap", "round");
-  l.setAttribute("marker-end", "url(#ah)");
+  l.setAttribute("stroke", red ? "rgba(215, 40, 40, .85)" : "var(--arrow)"); l.setAttribute("stroke-width", "16"); l.setAttribute("stroke-linecap", "round");
+  l.setAttribute("marker-end", red ? "url(#ahr)" : "url(#ah)");
   g.append(l);
 }
 
@@ -598,7 +625,7 @@ let token = 0;
 async function renderComment() {
   const my = ++token;
   const badge = $("badge"); badge.hidden = true;
-  $("aiOut").innerHTML = ""; $("aiNote").textContent = ""; $("speakBtn").hidden = true; stopSpeech();
+  $("aiOut").innerHTML = ""; $("aiNote").textContent = ""; $("speakBtn").hidden = $("replayBtn").hidden = true; stopSpeech(false); stopReplay(false);
   const cbox = $("comment");
   if (ply === 0) {
     $("mvName").textContent = "Kiinduló állás";
@@ -645,10 +672,10 @@ async function renderComment() {
 
 // ---------- Claude elemzés (sample capability) ----------
 let sampleFn = null, aiCtl = null;
-const aiKey = () => `elemzes:v3:${game.meta.id}:${ply}`;
+const aiKey = () => `elemzes:v4:${game.meta.id}:${ply}`;
 function renderMd(el, text) {
   el.innerHTML = "";
-  if (el.id === "aiOut") $("speakBtn").hidden = !text.trim();
+  if (el.id === "aiOut") $("speakBtn").hidden = $("replayBtn").hidden = !text.trim();
   let ul = null;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
@@ -686,9 +713,15 @@ Stockfish adatok (mélység ${DEPTH}):
 ${eng}
 ${game.comments[i] ? "Rövid meglévő kommentár: " + game.comments[i] : ""}`;
 }
+const fmtUsd = v => "$" + (v < 0.01 ? v.toFixed(4) : v.toFixed(3));
+async function showUsage(u) { // tokenek és költség: ez a hívás + a szerver naplója szerinti összeg
+  const el = $("aiUsage"); if (!u) { el.textContent = ""; return; }
+  let tot = ""; try { const t = await (await fetch("/api/usage")).json(); tot = ` · összesen ${t.calls} hívás, ${fmtUsd(t.cost)}`; } catch {}
+  el.textContent = `Token: ${u.prompt}+${u.output}=${u.prompt + u.output} · ≈${fmtUsd(u.cost || 0)}${tot}`;
+}
 async function runAi(question) {
   if (!sampleFn || ply === 0) return;
-  aiCtl?.abort(); aiCtl = new AbortController();
+  aiCtl?.abort(); aiCtl = new AbortController(); stopSpeech(); stopReplay();
   const out = $("aiOut"), note = $("aiNote"), myPly = ply, key = aiKey();
   $("aiBtn").disabled = true; $("askBtn").disabled = true; $("aiStop").hidden = false;
   out.innerHTML = ""; note.textContent = "Az AI gondolkodik… (5–60 másodperc)";
@@ -699,7 +732,7 @@ async function runAi(question) {
 ${ctx}
 
 A kérdés: ${question}`
-    : `Sakkedző vagy: vidám, szórakoztató, de szakmailag pontos. Magyarul beszélj, magyar figurajelöléssel (K=király, V=vezér, B=bástya, F=futó, H=huszár). Köszönés és bevezető nélkül, rögtön a címsorokkal. Pontosan három rövid szakasz, '## ' címsorral, összesen legfeljebb 90 szó:
+    : `Sakkedző vagy: vidám, szórakoztató, de szakmailag pontos. Magyarul beszélj, magyar figurajelöléssel (K=király, V=vezér, B=bástya, F=futó, H=huszár). Köszönés és bevezető nélkül, rögtön a címsorokkal. Pontosan három rövid szakasz, '## ' címsorral, összesen legfeljebb ${CFG["ai.maxWords"]} szó:
 ## Mi történt? (1–2 mondat)
 ## Miért jó vagy rossz? (2 mondat, a motoradatokra hivatkozva; ha a motor mást javasol, mondd meg, miért jobb)
 ## Mi jön most? (1–2 mondat: a legvalószínűbb folytatás és terv)
@@ -707,11 +740,13 @@ Csak azt állítsd, ami a megadott lépésekből, a FEN-ből és a motoradatokb�
 
 ${ctx}`;
   try {
-    const { text, truncated } = await sampleFn(prompt, {
+    const res = await sampleFn(prompt, {
       signal: aiCtl.signal, modelTier: "default", cache: !question,
       onText: ({ text }) => { if (ply === myPly) { note.textContent = ""; renderMd(out, text); } }
     });
-    if (ply === myPly) renderMd(out, text);
+    const { text, truncated } = res;
+    showUsage(res.usage);
+    if (ply === myPly) { renderMd(out, text); if (CFG["replay.autoStart"]) startReplay(); } // kész az elemzés: az elemzett lépések automatikus lejátszása
     if (!question) store.set(key, text);
     if (truncated && ply === myPly) note.textContent = "A válasz túl hosszú volt, ezért levágódott.";
   } catch (e) {
@@ -727,27 +762,133 @@ ${ctx}`;
 }
 
 // ---------- Felolvasás (böngésző beépített beszédszintézise, magyar hang) ----------
-function stopSpeech() { try { speechSynthesis.cancel(); } catch {} const b = $("speakBtn"); if (b) b.textContent = "🔊 Felolvasás"; }
-function speechText(t) {
-  return t.replace(/O-O-O/g, "hosszú sánc").replace(/O-O/g, "rövid sánc").replace(/\+/g, " sakk").replace(/#/g, " matt")
-    .replace(/(\d+)\.\s*(\.\.)?/g, "$1. lépés ").replace(/\s+/g, " ");
+// Lépések felismerése a (magyar jelölésű) szövegben, és feloldásuk a chess.js-sel
+const MOVE_RE = /(?<![\p{L}\d])(?:(O-O-O|O-O)|([KVBFH][a-h]?[1-8]?x?[a-h][1-8](?:=[VBFH])?|[a-h]x[a-h][1-8](?:=[VBFH])?|(?<=\d\.{1,3}\s?)[a-h][1-8](?:=[VBFH])?))([+#]?)(?![\p{L}\d])/gu;
+const EN = { V: "Q", F: "B", H: "N", B: "R", K: "K" };
+const PIECE_HU = { K: "király ", V: "vezér ", B: "bástya ", F: "futó ", H: "huszár " };
+function toEnSan(t) { return t.replace(/^[KVBFH]/, m => EN[m]).replace(/=([VBFH])/, (_, p) => "=" + EN[p]); }
+function speakMove(san, mark) {
+  if (san === "O-O-O") return "hosszú sánc" + mark;
+  if (san === "O-O") return "rövid sánc" + mark;
+  let x = san.replace(/^[KVBFH]/, m => PIECE_HU[m]).replace(/x/, " üti ").replace(/=([VBFH])/, (_, p) => " átváltozik " + PIECE_HU[p]);
+  return x + (mark === "+" ? " sakk" : mark === "#" ? " matt" : "");
+}
+// Visszaadja a felolvasandó szöveget és a lépések helyét benne: [{ start, end, from, to }]
+function buildSpeech(text, fenBefore, fenAfter) {
+  let run = null, out = "", last = 0; const marks = [];
+  const plain = t => t.replace(/\+(\d)/g, "plusz $1").replace(/\s+/g, " ");
+  const tryMove = (san) => {
+    const starts = [run, fenAfter, fenBefore].filter(Boolean);
+    for (const f of starts) {
+      const ch = typeof f === "string" ? new Chess(f) : f;
+      const m = ch.move(toEnSan(san), { sloppy: true });
+      if (m) { run = ch; return m; }
+    }
+    return null;
+  };
+  for (const m of text.matchAll(MOVE_RE)) {
+    const san = (m[1] || m[2]), mv = tryMove(san);
+    if (!mv) continue; // nem szabályos lépés ebben az állásban: sima szövegként marad
+    out += plain(text.slice(last, m.index));
+    const spoken = speakMove(san, m[3]);
+    marks.push({ start: out.length, end: out.length + spoken.length, from: mv.from, to: mv.to, fen: run.fen() });
+    out += spoken; last = m.index + m[0].length;
+  }
+  out += plain(text.slice(last));
+  return { text: out, marks };
+}
+let sayShown = null; // épp mutatott felolvasás-lépés (null = az eredeti állás látszik)
+function sayMove(mk) {
+  if (mk === sayShown) return;
+  sayShown = mk;
+  if (!mk) { // vissza az eredeti állásra és a motor eredeti (zöld) nyilához
+    renderBoard();
+    const ev = evalCache[game.fens[ply]]; if (ev?.best) drawArrow(ev.best);
+    return;
+  }
+  const captured = pieceHtmlAt(mk.to);
+  renderBoard(mk.fen);
+  const cells = $("board").children;
+  for (const [name, cls] of [[mk.from, "say-from"], [mk.to, "say-to"]]) {
+    const [x, y] = sqXY(name); cells[y * 8 + x]?.classList.add(cls);
+  }
+  drawArrow(mk.from + mk.to, true); // a kimondott/elemzett lépés piros nyíllal
+  animateMove(mk.from, mk.to, captured, Number(CFG["animation.ms"]) || 900);
+}
+let sayTimers = [];
+function stopSpeech(restore = true) {
+  try { speechSynthesis.cancel(); } catch {}
+  sayTimers.forEach(clearTimeout); sayTimers = [];
+  if (restore) sayMove(null);
+  const b = $("speakBtn"); if (b) b.textContent = "🔊 Felolvasás";
 }
 $("speakBtn").addEventListener("click", () => {
   if (!("speechSynthesis" in window)) { $("aiNote").textContent = "A böngésző nem támogatja a felolvasást."; return; }
   if (speechSynthesis.speaking) { stopSpeech(); return; }
-  const u = new SpeechSynthesisUtterance(speechText($("aiOut").innerText));
-  const hu = speechSynthesis.getVoices().find(v => /^hu/i.test(v.lang));
-  u.lang = "hu-HU"; if (hu) u.voice = hu; else $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
+  stopReplay(false);
+  const sp = buildSpeech($("aiOut").innerText, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]);
+  const u = new SpeechSynthesisUtterance(sp.text);
+  const hu = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(String(CFG["speech.lang"]).slice(0, 2).toLowerCase()));
+  u.lang = CFG["speech.lang"]; u.rate = Number(CFG["speech.rate"]) || 1; if (hu) u.voice = hu; else $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
+  let gotBoundary = false;
+  u.onboundary = e => { gotBoundary = true; const m = sp.marks.find(m => e.charIndex >= m.start && e.charIndex < m.end); if (m) sayMove(m); };
+  u.onstart = () => {
+    // egyes (hálózati) hangok nem küldenek szóhatár-eseményt: ilyenkor becsült időzítés (~14 karakter/mp)
+    sayTimers.push(setTimeout(() => {
+      if (gotBoundary) return;
+      for (const m of sp.marks) {
+        sayTimers.push(setTimeout(() => sayMove(m), m.start / 14 * 1000));
+      }
+    }, 1200));
+  };
   u.onend = u.onerror = () => stopSpeech();
   $("speakBtn").textContent = "⏹ Leállítás"; speechSynthesis.speak(u);
 });
 
+// ---------- Elemzett lépések lejátszása (alternatív változat, piros kiemeléssel) ----------
+const stepMs = () => (Number(CFG["replay.stepSeconds"]) || 3) * 1000;
+let replayTimers = [];
+function stopReplay(restore = true) {
+  replayTimers.forEach(clearTimeout); replayTimers = [];
+  const b = $("replayBtn"); if (b) b.textContent = "▶ Lejátszás";
+  if (restore) sayMove(null); // vissza az eredeti állásra
+}
+function startReplay() {
+  stopReplay(false); stopAutoplay();
+  const note = $("aiNote");
+  const marks = buildSpeech($("aiOut").innerText, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]).marks;
+  if (!marks.length) { note.textContent = "Az elemzésben nincs lejátszható lépés."; return; }
+  $("replayBtn").textContent = "⏹ Leállítás";
+  const n = marks.length;
+  const play = () => { // egy kör: lépések sorban, majd egy szünet az eredeti állással, aztán újra
+    replayTimers = [];
+    marks.forEach((m, i) => replayTimers.push(setTimeout(() => { sayMove(m); note.textContent = `Az elemzett változat: ${i + 1}/${n} · leállítás: ⏹ vagy ▶ (tovább)`; }, i * stepMs())));
+    replayTimers.push(setTimeout(() => { sayMove(null); note.textContent = "Eredeti állás – mindjárt újra…"; }, n * stepMs()));
+    if (CFG["replay.loop"]) replayTimers.push(setTimeout(play, (n + 1) * stepMs()));
+    else replayTimers.push(setTimeout(() => { stopReplay(true); note.textContent = "Vége – az „▶ Lejátszás” gombbal újrakezdheted."; }, (n + 1) * stepMs()));
+  };
+  play();
+}
+$("replayBtn").addEventListener("click", () => { if (replayTimers.length) { stopReplay(true); $("aiNote").textContent = ""; } else { stopSpeech(); startReplay(); } });
+
+// ---------- A játszma automatikus lejátszása (ugyanaz az animáció, sárga kiemeléssel) ----------
+let autoTimer = null;
+function stopAutoplay() { clearInterval(autoTimer); autoTimer = null; const b = $("bPlay"); if (b) b.textContent = "⏵ Játszma"; }
+function startAutoplay() {
+  stopReplay(); stopSpeech();
+  if (ply >= game.sans.length) go(0, true);
+  $("bPlay").textContent = "⏸ Játszma";
+  autoTimer = setInterval(() => { if (ply >= game.sans.length) { stopAutoplay(); return; } go(ply + 1, true); }, (Number(CFG["play.stepSeconds"]) || 3) * 1000);
+}
 // ---------- Navigáció ----------
-function go(p) {
+function go(p, auto = false) {
   p = Math.max(0, Math.min(game.sans.length, p));
-  if (p !== ply) { aiCtl?.abort(); stopSpeech(); }
+  if (p !== ply) { aiCtl?.abort(); stopSpeech(false); stopReplay(false); if (!auto) stopAutoplay(); }
+  const step = ply >= 0 && p === ply + 1 && p > 0 ? lastMoveSquares(p) : null; // egy lépés előre: animáljuk
+  const captured = step ? pieceHtmlAt(step[1]) : "";
   ply = p;
   renderBoard(); markCurrent(); renderComment();
+  if (step?.length) animateMove(step[0], step[1], captured, Number(CFG["animation.ms"]) || 900);
   $("bStart").disabled = $("bPrev").disabled = ply === 0;
   $("bEnd").disabled = $("bNext").disabled = ply === game.sans.length;
   store.set("utolso", game.meta.id + ":" + ply);
@@ -800,6 +941,7 @@ $("bStart").onclick = () => go(0);
 $("bPrev").onclick = () => go(ply - 1);
 $("bNext").onclick = () => go(ply + 1);
 $("bEnd").onclick = () => go(game.sans.length);
+$("bPlay").onclick = () => { if (autoTimer) stopAutoplay(); else startAutoplay(); };
 $("bFlip").onclick = () => { flipped = !flipped; renderBoard(); if (evalCache[game.fens[ply]]) { setEvalBar(evalCache[game.fens[ply]]); drawArrow(evalCache[game.fens[ply]].best); } };
 $("aiBtn").onclick = () => runAi();
 $("aiStop").onclick = () => aiCtl?.abort();
@@ -822,6 +964,7 @@ const _ready = setInterval(() => { if (engineReady && game) { clearInterval(_rea
 initEngine();
 
 (async () => {
+  try { Object.assign(CFG, await (await fetch("/api/settings")).json()); } catch { /* alapértékek */ }
   try { sampleFn = window.claude ? await window.claude.use("sample") : null; } catch { sampleFn = null; }
   // Önálló futás: a server.js proxyn át Gemini (a kulcs a szerveren marad)
   if (!sampleFn) {
