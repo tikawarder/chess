@@ -43,7 +43,9 @@ Amíg nincs beállító felület, minden nem titkos beállítás a `settings.pro
 | `ai.model`, `ai.temperature`, `ai.maxOutputTokens`, `ai.thinkingBudget` | gemini-2.5-flash, 0.7, 1024, 0 | A Gemini hívás paraméterei |
 | `ai.maxWords` | 90 | Az elemzés kért hossza (hogy kiférjen az oldalra) |
 | `replay.autoStart`, `replay.stepSeconds`, `replay.loop` | true, 3, true | Az elemzett lépések automatikus, ismétlődő lejátszása a táblán, piros kiemeléssel |
-| `speech.autoStart`, `speech.lang`, `speech.rate` | false, hu-HU, 1 | Felolvasás; közben a kimondott lépés szinkronban, pirosan jelenik meg a táblán (a szöveg lépésenként szeletelve szól, így nem függ a böngésző szóhatár-eseményeitől) |
+| `speech.autoStart`, `speech.blinkSquares`, `speech.lang`, `speech.rate` | false, true, hu-HU, 1 | Felolvasás; közben a kimondott lépés szinkronban, pirosan jelenik meg a táblán (a szövegben hivatkozott mezők, pl. „az e5-ös gyalogot”, a mondat végéig villognak (AI-elemzésnél pirosan, a PGN-kommentárnál sárgán); a szöveg lépésenként szeletelve szól, így nem függ a böngésző szóhatár-eseményeitől) |
+| `board.moveArrow` | true | Az aktuális lépés zöld nyila: honnan hová ment a bábu |
+| `board.engineArrow` | false | A motor javasolt következő lépésének zöld nyila lépéskor (alapból ki; az AI-lépések piros nyila ettől független) |
 | `animation.enabled`, `animation.ms` | true, 900 | A bábuk lassú odacsúszása, ütésnél az ütött bábu elhalványul; kézi léptetésnél, PGN-lejátszásnál és AI-lejátszásnál is ugyanaz |
 | `play.stepSeconds` | 3 | A ⏵ Játszma gombbal indított PGN-lejátszás lépésköze (sárga kiemelés; az AI-lejátszásé piros) |
 
