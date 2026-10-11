@@ -52,7 +52,7 @@ test("hibás bemenet 400, túl nagy 413, Gemini-hiba nem szivárogtat kulcsot", 
   const s = createServer({ usageFile: null, apiKey: "TESZT-KULCS", baseUrl: `http://127.0.0.1:${gp}/v1beta` }); const p = await listen(s);
   assert.strictEqual((await post(p, "/api/analyze", "nem json")).status, 400);
   assert.strictEqual((await post(p, "/api/analyze", { prompt: "" })).status, 400);
-  assert.strictEqual((await post(p, "/api/analyze", { prompt: "a".repeat(70000) })).status, 413);
+  assert.strictEqual((await post(p, "/api/analyze", { prompt: "a".repeat(170000) })).status, 413);
   const r = await post(p, "/api/analyze", { prompt: "x" });
   assert.strictEqual(r.status, 502);
   assert.ok(!(await r.text()).includes("TESZT-KULCS"));
@@ -75,4 +75,54 @@ test("settings.properties: típusos beolvasás, /api/settings, a modell és a pa
   assert.strictEqual(g.seen[0].body.generationConfig.temperature, 0.2);
   assert.strictEqual(g.seen[0].body.generationConfig.maxOutputTokens, 77);
   s.closeAllConnections(); s.close(); g.srv.closeAllConnections(); g.srv.close(); fs.unlinkSync(file);
+});
+
+test("könyvtár: mappa beolvasása, lista, játszma lekérése, útvonal-bejárás tiltva", async () => {
+  const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sakk-lib-"));
+  fs.writeFileSync(path.join(dir, "larsen.pgn"), '[Event "Linares"]\n[Date "1975.03.02"]\n[White "Larsen, Bent"]\n[Black "Portisch, Lajos"]\n[Result "1-0"]\n\n{Comment} 1. b3 e5 2. Bb2 Nc6 3. e3 d5 1-0\n\n[Event "Másik"]\n[White "A"]\n[Black "B"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *\n');
+  fs.writeFileSync(path.join(dir, "latin1.pgn"), Buffer.from('[Event "Pol\xe1r"]\n[White "Pol\xe1r"]\n[Black "X"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *\n', "latin1"));
+  fs.writeFileSync(path.join(dir, "nem-pgn.txt"), "kihagyandó");
+  const s = createServer({ usageFile: null, gamesDir: dir }); const p = await listen(s);
+  const lib = await (await fetch(`http://127.0.0.1:${p}/api/library`)).json();
+  assert.strictEqual(lib.files, 2);
+  assert.strictEqual(lib.games.length, 3);
+  const larsen = lib.games.find(g => g.white === "Larsen, Bent");
+  assert.strictEqual(larsen.year, "1975"); assert.strictEqual(larsen.event, "Linares");
+  assert.ok(lib.games.some(g => g.white === "Polár"), "a Latin-1 fájl ékezete jó");
+  assert.ok(!JSON.stringify(lib).includes(dir), "a szerver abszolút útvonala nem szivárog");
+  const g = await (await fetch(`http://127.0.0.1:${p}/api/library/game?f=larsen.pgn&n=0`)).json();
+  assert.ok(g.pgn.includes("1. b3 e5"));
+  for (const bad of ["../server.js&n=0", "larsen.pgn&n=9", "larsen.pgn&n=-1", "%2e%2e%2fserver.js&n=0"]) {
+    assert.strictEqual((await fetch(`http://127.0.0.1:${p}/api/library/game?f=${bad}`)).status, 404, bad);
+  }
+  s.closeAllConnections(); s.close(); fs.rmSync(dir, { recursive: true });
+});
+
+test("fordítás: csak az új szöveg kerül tokenbe, gyorsítótár, hibás bemenet és rossz válasz kezelése", async () => {
+  const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
+  const cacheFile = path.join(os.tmpdir(), `sakk-tr-${process.pid}.json`);
+  const g = fakeGemini({ json: { candidates: [{ content: { parts: [{ text: JSON.stringify(["Fordítva: egy", "Fordítva: kettő"]) }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 50, totalTokenCount: 150 } } });
+  const gp = await listen(g.srv);
+  const s = createServer({ apiKey: "k", baseUrl: `http://127.0.0.1:${gp}/v1beta`, usageFile: null, translateCache: cacheFile }); const p = await listen(s);
+  const r1 = await (await post(p, "/api/translate", { texts: ["one", "two"] })).json();
+  assert.deepStrictEqual(r1.translations, ["Fordítva: egy", "Fordítva: kettő"]);
+  assert.strictEqual(r1.translated, 2); assert.strictEqual(r1.usage.total, 150);
+  assert.ok(g.seen[0].body.generationConfig.responseSchema, "JSON-séma kérve");
+  assert.ok(g.seen[0].body.contents[0].parts[0].text.includes('["one","two"]'));
+  // második kérés ugyanarra: gyorsítótárból, nincs új Gemini-hívás
+  const r2 = await (await post(p, "/api/translate", { texts: ["two", "one"] })).json();
+  assert.deepStrictEqual(r2.translations, ["Fordítva: kettő", "Fordítva: egy"]);
+  assert.strictEqual(r2.translated, 0); assert.strictEqual(g.seen.length, 1);
+  // hibás bemenetek
+  assert.strictEqual((await post(p, "/api/translate", { texts: [] })).status, 400);
+  assert.strictEqual((await post(p, "/api/translate", { texts: [1] })).status, 400);
+  assert.strictEqual((await post(p, "/api/translate", { texts: ["x".repeat(4001)] })).status, 400);
+  // rossz darabszámú válasz: 502, és nem kerül a gyorsítótárba
+  const bad = fakeGemini({ json: { candidates: [{ content: { parts: [{ text: '["csak egy"]' }] }, finishReason: "STOP" }] } });
+  const bp = await listen(bad.srv);
+  const s2 = createServer({ apiKey: "k", baseUrl: `http://127.0.0.1:${bp}/v1beta`, usageFile: null, translateCache: null }); const p2 = await listen(s2);
+  assert.strictEqual((await post(p2, "/api/translate", { texts: ["a", "b"] })).status, 502);
+  for (const x of [s, s2, g.srv, bad.srv]) { x.closeAllConnections(); x.close(); }
+  try { fs.unlinkSync(cacheFile); } catch {}
 });

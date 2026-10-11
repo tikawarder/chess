@@ -1,0 +1,182 @@
+[Event "Párizs, Olasz Opera páholya"]
+[Site "?"]
+[Date "1858.??.??"]
+[Round "?"]
+[White "Paul Morphy"]
+[Black "Braunschweigi herceg és Isouard gróf"]
+[Result "1-0"]
+[Opening "Philidor-védelem"]
+[Title "Az Operajátszma"]
+[Annotator "Claude (AI) – motorral nem ellenőrizve"]
+
+{Morphy egy operaelőadás szünetében játszott két nemes ellen, akik konzultálva közösen léptek. A
+játszma a fejlődés és a vonalnyitás iskolapéldája: világos minden tisztjét bevonja a támadásba, míg
+sötét figurái otthon maradnak.} 1. e4 {Klasszikus királygyalog-nyitás. Világos elfoglalja a
+centrumot, és egyszerre nyit utat a vezérnek és az f1-futónak.} 1... e5 {Sötét szimmetrikusan
+válaszol, és megveti lábát a centrumban.} 2. Nf3 {A huszár a legjobb mezőjére fejlődik, és rögtön
+támadja az e5-gyalogot. Ez a nyitás alapelve: tempóval fejlődni.} 2... d6 {Philidor-védelem.
+Szilárd, de passzív: a d6-gyalog bezárja az f8-futót a gyaloglánc mögé, így sötét lassabban
+fejlődik.} 3. d4 {Világos azonnal megnyitja a centrumot. Aki jobban fejlett, annak a nyílt állás
+kedvez.} 3... Bg4 {Kötés: a futó a huszárt a vezérhez szegezi. Ma 3…exd4-et vagy 3…Hf6-ot tartják
+jobbnak, mert ez a futó hamarosan elcserélődik, és sötét elveszíti a futópárt.} 4. dxe5 {Világos üt.
+Most már 4…dxe5 5.Vxd8+ Kxd8 6.Hxe5 után világos gyalogot nyerne, ezért sötét kényszerhelyzetbe
+kerül.} 4... Bxf3 {Szinte kötelező, de fájdalmas: sötét elcseréli egyetlen fejlett tisztjét. Világos
+vezére ezzel aktív mezőre jut.} 5. Qxf3 {A vezér visszaüt és máris a gyenge f7 pontra néz. A Fc4
+után matt fenyeget.} 5... dxe5 {Az anyag egyenlő, de a fejlődésben óriási a különbség: világosnak
+két tisztje aktív, sötétnek egyetlen tisztje sincs játékban.} 6. Bc4 {Fenyegetés: Vxf7 matt! A futó
+és a vezér együtt célozza f7-et, amit csak a király véd.} 6... Nf6 {A huszár elzárja az f-vonalat,
+így a vezér nem jut el f7-re. Egyben fejlődik is – jó lépés.} 7. Qb3 {Kettős támadás: a vezér
+egyszerre fenyegeti a b7-gyalogot és (a c4-futóval együtt) újra f7-et.} 7... Qe7 {A vezér védi
+f7-et, a b7-gyalogot viszont feladja. Ha 8.Vxb7, akkor 8…Vb4+ vezércserét kényszerít, és sötét
+védekezése megkönnyebbül.} 8. Nc3 {Morphy nem kapzsi: gyalograblás helyett fejleszt. A támadásban a
+tempó többet ér egy gyalognál.} 8... c6 {Szilárdítja a b5 és d5 mezőket, és helyet csinál a vezérnek
+– de ez újra gyaloglépés fejlődés helyett. Sötét lemaradása nő.} 9. Bg5 {Újabb kötés: a futó az
+f6-huszárt a vezérhez szegezi. Világos minden könnyűtisztje aktív.} 9... b5 {Sötét el akarja űzni a
+c4-futót, hogy enyhítse az f7 elleni nyomást. De ezzel megnyitja a vezérszárnyat, miközben a sötét
+király még középen áll.} 10. Nxb5 {Áldozat! Morphy odaadja a huszárt, hogy vonalakat nyisson a
+középen ragadt király ellen.} 10... cxb5 {Sötét elfogadja. A vonalak megnyílnak.} 11. Bxb5+ {Sakk! A
+futó visszaszerez egy gyalogot, és a d7-en keresztül kötést hoz létre a sötét király előtt.} 11...
+Nbd7 {Az egyetlen értelmes védekezés, de a d7-huszár most kötve áll: nem mozdulhat, mert a király
+sakkba kerülne.} 12. O-O-O {Hosszú sánc: a király biztonságba kerül, a bástya pedig egyetlen
+lépéssel a nyílt d-vonalra áll, és a kötött d7-huszárt támadja.} 12... Rd8 {Sötét még egy védővel
+erősíti meg a d7-et.} 13. Rxd7 {Bástyaáldozat! Világos a minőséget adja oda, hogy szétverje a sötét
+védelmet.} 13... Rxd7 {Sötét visszaüt, de most a d7-bástya áll kötve a király előtt.} 14. Rd1 {A
+második bástya is a d-vonalra jön, és ismét a kötött figurát támadja. Világos összes tisztje részt
+vesz a támadásban, sötét királyszárnya pedig még mindig fejletlen.} 14... Qe6 {A vezér újabb
+védőként érkezik d7-hez, és közben a b3-vezér cseréjét kínálja.} 15. Bxd7+ {Világos leüti a bástyát,
+sakkal. Az anyag most már nem számít – csak az idő.} 15... Nxd7 {A huszár kénytelen visszaütni.
+Ezzel elhagyja az f6 mezőt, és megnyílik a g5–d8 átló.} 16. Qb8+ {Vezéráldozat! A vezér sakkot ad
+b8-on, és arra kényszeríti a huszárt, hogy leüsse – így a huszár nem védheti tovább a d8 mezőt.}
+16... Nxb8 {Kényszerlépés: a huszár üt, és ezzel elhagyja a d7 mezőt.} 17. Rd8# {Matt! A bástya
+d8-on ad mattot, a g5-futó védelme alatt. Világos a vezért és egy bástyát feláldozva, két megmaradt
+tisztjével mattol – a fejlődés és az összjáték tökéletes példája.} 1-0
+
+[Event "Bécs"]
+[Site "?"]
+[Date "1910.??.??"]
+[Round "?"]
+[White "Réti Richárd"]
+[Black "Savielly Tartakower"]
+[Result "1-0"]
+[Opening "Caro–Kann-védelem"]
+[Title "Réti csapdája"]
+[Annotator "Claude (AI) – motorral nem ellenőrizve"]
+
+{Réti Richárd a Magyar Királyságban, Bazinban született, a hipermodern iskola egyik atyja. Ez a
+rövid játszma minden idők egyik leghíresebb miniatűrje: vezéráldozat, kettős sakk és matt 11
+lépésben.} 1. e4 {Királygyalog-nyitás: a centrum elfoglalása.} 1... c6 {Caro–Kann-védelem. Sötét
+előbb a c6-gyaloggal előkészíti a …d5-öt, így a centrumért szilárd gyalogszerkezettel harcol.} 2. d4
+{Világos klasszikus módon két gyaloggal foglalja el a centrumot.} 2... d5 {Sötét azonnal megtámadja
+az e4-gyalogot – ez a Caro–Kann lényege.} 3. Nc3 {A huszár fejlődik és védi e4-et.} 3... dxe4 {Sötét
+elcseréli a centrumgyalogot, megnyitva a játékot.} 4. Nxe4 {Világos huszárral üt vissza, és az e4-en
+centrális helyre kerül.} 4... Nf6 {Sötét huszárja támadja az e4-huszárt. Csere vagy visszavonulás
+következik.} 5. Qd3 {Szokatlan lépés! A vezér védi a huszárt és előkészíti a hosszú sáncot.
+Kockázatos, mert a vezér a d-vonalon áll – később ez lesz a döntő motívum.} 5... e5 {Sötét a
+centrumot nyitja, kihasználva, hogy világos vezére a d-vonalon áll. Ambiciózus, de a saját királya
+is középen marad.} 6. dxe5 {Világos leüti a gyalogot, és a d-vonal megnyílik.} 6... Qa5+ {Sakk, és
+sötét vissza akarja nyerni a gyalogot az e5-ön.} 7. Bd2 {Futóval védi a sakkot, és közben fejlődik –
+egyben előkészíti a hosszú sáncot.} 7... Qxe5 {Sötét visszanyerte a gyalogot, az anyag egyenlő.} 8.
+O-O-O {Csapda! Világos hosszú sáncol, és látszólag 'odaadja' az e4-huszárt: a bástya most a
+d-vonalon áll, a vezér mögött.} 8... Nxe4 {Sötét bekapja a csalit. A huszár leütése után azonban a
+d-vonal végzetessé válik a középen álló sötét király számára.} 9. Qd8+ {Vezéráldozat! 9.Vd8+ – a
+vezért adja oda, hogy a sötét királyt a d-vonalra csalja.} 9... Kxd8 {Kényszerlépés: a király
+kénytelen ütni (a vezért más nem üthette, és Ke7 nem lehetséges).} 10. Bg5+ {Kettős sakk! A g5-futó
+és a d1-bástya egyszerre ad sakkot. Kettős sakk ellen csak a király lépése segít.} 10... Kc7 {Ha
+10…Ke8, akkor 11.Bd8 matt. A király c7-re menekül…} 11. Bd8# {Matt! A futó d8-on mattot ad. A
+d1-bástya fedezi a d-vonalat, a sötét király saját figurái közé szorult. Világos vezért és huszárt
+áldozva, 11 lépésben nyert.} 1-0
+
+[Event "London"]
+[Site "?"]
+[Date "1851.??.??"]
+[Round "?"]
+[White "Adolf Anderssen"]
+[Black "Lionel Kieseritzky"]
+[Result "1-0"]
+[Opening "Királycsel, Bryan-ellencsel"]
+[Title "A Halhatatlan játszma"]
+[Annotator "Claude (AI) – motorral nem ellenőrizve"]
+
+{A romantikus sakk korszakának jelképe. Anderssen mindkét bástyáját, a vezérét és egy futót
+feláldoz, majd három könnyűtiszttel mattot ad.} 1. e4 e5 2. f4 {Királycsel: világos gyalogot ajánl
+fel, hogy megnyissa az f-vonalat és gyorsan támadhasson. A 19. század kedvenc nyitása.} 2... exf4
+{Sötét elfogadja a cselt.} 3. Bc4 Qh4+ {Sakk! A vezér kihasználja, hogy az e1–h4 átló gyenge.
+Világos király nem sáncolhat többé.} 4. Kf1 {A király kénytelen elmozdulni, de a sötét vezér is
+kiszolgáltatott helyzetbe kerül, ahol tempót lehet nyerni ellene.} 4... b5 {Bryan-ellencsel: sötét
+gyalogot ad, hogy elterelje a c4-futót az f7-ről.} 5. Bxb5 Nf6 6. Nf3 Qh6 7. d3 Nh5 8. Nh4 Qg5 9.
+Nf5 {A huszár f5-ön erős mezőt foglal el, és g7-et támadja.} 9... c6 10. g4 {Világos gyalogjaival
+űzi a sötét vezért és huszárt, tempót nyerve.} 10... Nf6 11. Rg1 {Futóáldozat! Anderssen nem menti a
+b5-futót, hanem a bástyát hozza fedezékbe. Világos fejlődésbeli előnyét fontosabbnak tartja az
+anyagnál.} 11... cxb5 {Sötét leüti a futót, egy egész tiszttel több.} 12. h4 Qg6 13. h5 Qg5 14. Qf3
+Ng8 15. Bxf4 Qf6 16. Nc3 {Fejlődés: a vezérszárnyi huszár is beavatkozik.} 16... Bc5 17. Nd5 {A
+huszár d5-re ugrik, fenyeget Hc7+-szal és a vezér beszorításával. Sötét kapzsi lépést választ.}
+17... Qxb2 {Sötét gyalogot üt és mindkét világos bástyát támadja. Anyagilag nyer, de vezére messze
+kerül a királyától.} 18. Bd6 {Az egyik leghíresebb lépés a sakk történetében: Anderssen nem védi a
+bástyákat! Mindkettőt feláldozza, hogy a futó elvágja a sötét király útját (f8 mező).} 18... Bxg1
+{Sötét leüti az egyik bástyát.} 19. e5 {Csendes lépés! Az e5-gyalog elzárja a sötét vezért a g7 mező
+védelmétől. Ez készíti elő a mattot.} 19... Qxa1+ {Sötét a második bástyát is leüti, sakkal.
+Anyagilag óriási előnyben van – de már késő.} 20. Ke2 {A király lép, és a sötét sakkok elfogytak.}
+20... Na6 21. Nxg7+ {Sakk! A huszár g7-en üt, a sötét király a d8-ra kényszerül.} 21... Kd8 {Az
+egyetlen lépés.} 22. Qf6+ {Vezéráldozat! A vezér f6-on sakkot ad, és a huszár kénytelen leütni –
+ezzel nyílik meg az e7 mező a futó előtt.} 22... Nxf6 {Kényszerlépés.} 23. Be7# {Matt! Világos egy
+futóval és két huszárral mattol, miközben két bástyát, a vezért és egy futót áldozott. A d5-huszár
+fedezi c7-et és e7-et, a d6-futó elvágja a menekülést.} 1-0
+
+[Event "Berlin"]
+[Site "?"]
+[Date "1852.??.??"]
+[Round "?"]
+[White "Adolf Anderssen"]
+[Black "Jean Dufresne"]
+[Result "1-0"]
+[Opening "Evans-csel"]
+[Title "Az Örökzöld játszma"]
+[Annotator "Claude (AI) – motorral nem ellenőrizve"]
+
+{Steinitz nevezte el 'örökzöld babérnak Anderssen koszorújában'. A csúcspont egy gyönyörű
+áldozatsorozat, amely kettős sakkal zárul.} 1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 {Evans-csel:
+világos gyalogot áldoz, hogy tempót nyerve felépítse a c3–d4 centrumot.} 4... Bxb4 {Sötét elfogadja
+a cselt.} 5. c3 Ba5 6. d4 {A centrum megnyitása: világos fejlődési előnye így érvényesülhet.} 6...
+exd4 7. O-O {Sánc: a király biztonságban, a bástya hamarosan a nyílt vonalra kerül.} 7... d3 8. Qb3
+Qf6 9. e5 Qg6 10. Re1 Nge7 11. Ba3 {A futó a hosszú átlón elvágja a sötét király útját – sötét nem
+tud sáncolni.} 11... b5 12. Qxb5 Rb8 13. Qa4 Bb6 14. Nbd2 Bb7 15. Ne4 Qf5 16. Bxd3 Qh5 17. Nf6+
+{Huszáráldozat! A g-vonal megnyílik, és a sötét király tartósan középen ragad.} 17... gxf6 18. exf6
+Rg8 19. Rad1 {Az egyik leghíresebb csendes lépés: világos nem védekezik a …Vxf3 fenyegetés ellen,
+hanem a d-vonalra hozza a bástyát. Sötét leüti a huszárt, de a támadás gyorsabb.} 19... Qxf3 {Sötét
+üt, és saját matt-fenyegetést állít fel a g-vonalon. Világosnak sakkokkal kell nyernie.} 20. Rxe7+
+{Sakk! A bástya áldozza magát, hogy elterelje a huszárt az e7-ről.} 20... Nxe7 21. Qxd7+
+{Vezéráldozat! A vezér d7-en sakkot ad, a király kénytelen leütni.} 21... Kxd7 22. Bf5+ {Kettős
+sakk: a f5-futó és a d1-bástya egyszerre ad sakkot.} 22... Ke8 23. Bd7+ {Sakk – a király a f8-ra
+kényszerül.} 23... Kf8 24. Bxe7# {Matt! A futó e7-en mattot ad. A f6-gyalog és a futók hálója zárja
+körbe a királyt.} 1-0
+
+[Event "New York, Rosenwald-emlékverseny"]
+[Site "?"]
+[Date "1956.??.??"]
+[Round "?"]
+[White "Donald Byrne"]
+[Black "Bobby Fischer"]
+[Result "0-1"]
+[Opening "Grünfeld-védelem (Hf3 lépésrenddel)"]
+[Title "Az évszázad játszmája"]
+[Annotator "Claude (AI) – motorral nem ellenőrizve"]
+
+{A 13 éves Fischer egy vezéráldozattal és egy 'malom' sakksorozattal semmisíti meg az erős Byrne-t.
+A játszma a modern dinamikus sakk mintapéldája.} 1. Nf3 Nf6 2. c4 g6 3. Nc3 Bg7 4. d4 O-O 5. Bf4 d5
+{Sötét a centrumban üt vissza: Grünfeld-szerű szerkezet, ahol sötét a világos centrumot alakzataival
+támadja.} 6. Qb3 dxc4 7. Qxc4 c6 8. e4 Nbd7 9. Rd1 Nb6 10. Qc5 Bg4 11. Bg5 {Világos kötést hoz
+létre, de a király még középen áll – ezt Fischer ki fogja használni.} 11... Na4 {Zseniális lépés! A
+huszár a c3-huszárt támadja; ha világos üt, a vezér a e7-ről és a d-vonalról nem tud egyszerre
+védekezni.} 12. Qa3 Nxc3 13. bxc3 Nxe4 {Sötét gyalogot nyer, és megnyitja az e-vonalat a világos
+király ellen.} 14. Bxe7 Qb6 {Fischer nem menti az e7-en lévő bástyát (Fxf8 fenyeget), hanem
+ellentámadást indít.} 15. Bc4 Nxc3 16. Bc5 Rfe8+ 17. Kf1 Be6 {Az évszázad lépése: Fischer feláldozza
+a vezérét! A futó a c4-futót támadja, és megnyitja a 'malom' sorozatot.} 18. Bxb6 {Byrne elfogadja a
+vezért.} 18... Bxc4+ {Sakk! Kezdődik a malom: a futó és a huszár felváltva ad sakkokat, és sorra
+szedi a világos figurákat.} 19. Kg1 Ne2+ {Felfedett sakk a malom elején.} 20. Kf1 Nxd4+ {A huszár
+leüti a d4-gyalogot, sakkal.} 21. Kg1 Ne2+ 22. Kf1 Nc3+ {A huszár visszatér c3-ra, és a d1-bástyát
+támadja.} 23. Kg1 axb6 {Fischer végre visszaüti a vezért. Összesítés: bástya, két futó és huszár a
+vezérért – sötét messze előnyben van.} 24. Qb4 Ra4 25. Qxb6 Nxd1 {Sötét a bástyát is begyűjti.} 26.
+h3 Rxa2 27. Kh2 Nxf2 28. Re1 Rxe1 29. Qd8+ Bf8 30. Nxe1 Bd5 31. Nf3 Ne4 32. Qb8 b5 33. h4 h5 34. Ne5
+Kg7 35. Kg1 Bc5+ 36. Kf1 Ng3+ 37. Ke1 Bb4+ 38. Kd1 Bb3+ 39. Kc1 Ne2+ 40. Kb1 Nc3+ 41. Kc1 Rc2#
+{Matt! Fischer a két futóval, a huszárral és a bástyával koordinált hálót sző a világos király
+köré.} 0-1

@@ -1,3 +1,9 @@
 .env
 node_modules/
 usage.jsonl
+
+# Letöltött játszmák és fordítási gyorsítótár (nem kerülnek a repóba)
+games/*
+!games/beepitett/
+!games/OLVASSEL.txt
+translate-cache.json

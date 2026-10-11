@@ -1,0 +1,3 @@
+Ide tedd a letöltött .pgn fájlokat (pl. Lichess-tanulmányok exportja).
+A program a mappát beolvassa, és a fájlokban lévő játszmákat listázza.
+A fájlok nincsenek verziókezelve (a kommentárok szerzői jogvédettek lehetnek).

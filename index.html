@@ -69,6 +69,22 @@ h1 span { color: var(--accent); }
 .sq .coord.f { right: 3px; bottom: 2px; } .sq .coord.r { left: 3px; top: 3px; }
 .pc { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", "Arial Unicode MS", serif; font-size: 78cqh; line-height: 1; }
 .pc span { position: absolute; }
+.lib-row { display: flex; gap: 6px; margin-top: 6px; }
+.lib-row input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: .85rem; }
+.lib-list { max-height: 260px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.lib-list:empty { display: none; }
+.lib-item { display: flex; justify-content: space-between; gap: 10px; padding: 6px 9px; cursor: pointer; font-size: .85rem; border-bottom: 1px solid var(--line); }
+.lib-item:last-child { border-bottom: 0; }
+.lib-item:hover, .lib-item:focus-visible { background: rgba(120, 160, 140, .15); outline: none; }
+.lib-item.cur { background: rgba(31, 111, 92, .22); font-weight: 600; }
+.lib-item > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.lib-meta { flex: none; color: var(--muted); text-align: right; font-size: .78rem; }
+.filebtn { font-size: .8rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.tr-note { font: .75rem var(--font-display); color: var(--muted); margin: 4px 0 0; }
+.tr-cap { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+.tr-cap .orig { font-size: .75rem; padding: 0 2px; background: none; border: 0; text-decoration: underline; color: inherit; cursor: pointer; }
+.vars { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+.vars p { margin: 2px 0; }
 .cmt-speak { margin-top: 8px; }
 .blinkmark.yellow { animation-name: sqblinkY; }
 @keyframes sqblinkY {
@@ -196,6 +212,7 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
         <p class="engine-line" id="engineLine"></p>
         <div class="comment" id="comment"></div>
         <button id="speakCmtBtn" class="cmt-speak" hidden title="A kommentár felolvasása; a szövegben hivatkozott mezők sárgán villognak">🔊 Felolvasás</button>
+        <p class="tr-note" id="trNote"></p>
         <div class="ai" id="aiBox" hidden>
           <div class="ai-actions">
             <button class="primary" id="aiBtn">Részletes elemzés AI-val</button>
@@ -227,12 +244,20 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
         </div>
       </div>
 
+      <div class="card" id="libCard" hidden>
+        <p class="section-label">Letöltött játszmák <span id="libCount"></span></p>
+        <div class="lib-row"><input id="libQ" type="search" placeholder="Keresés: Larsen - Portisch - 1975, Linares  vagy  /Larsen.*1975/i" aria-label="Játszmák keresése"><button id="libRefresh" title="A games mappa újraolvasása" aria-label="Frissítés">↻</button></div>
+        <div class="lib-list" id="libList" role="listbox"></div>
+        <p class="hint" id="libNote"></p>
+      </div>
+
       <div class="card">
         <details class="import" id="importBox">
           <summary>Saját játszma betöltése (PGN)</summary>
           <p class="hint">Chess.com: a játszma alatt Megosztás → PGN → Másolás. Lichess, chessgames.com és pgnmentor.com játszmái is működnek. Illeszd be ide:</p>
           <textarea id="pgnIn" placeholder='[White "Polgár Judit"]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 ...'></textarea>
-          <div class="import-row"><button class="primary" id="pgnLoad">Betöltés</button><span class="err" id="pgnErr"></span></div>
+          <div class="import-row"><button class="primary" id="pgnLoad">Betöltés</button><label class="filebtn">vagy .pgn fájl(ok): <input type="file" id="pgnFile" accept=".pgn,.txt" multiple></label></div>
+          <p class="hint"><span class="err" id="pgnErr"></span><span id="importNote"></span></p>
         </details>
       </div>
     </div>
@@ -240,139 +265,9 @@ details.import textarea { width: 100%; min-height: 140px; margin-top: 10px; font
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="pgn.js"></script>
 <script>
 // ---------- Beépített játszmák magyar kommentárral (kulcs: lépés sorszáma 0-tól, félépésben) ----------
-const GAMES = [
-{ id: "opera", title: "Az Operajátszma", white: "Paul Morphy", black: "Braunschweigi herceg és Isouard gróf", event: "Párizs, Olasz Opera páholya", year: "1858", result: "1–0", opening: "Philidor-védelem",
-  intro: "Morphy egy operaelőadás szünetében játszott két nemes ellen, akik konzultálva közösen léptek. A játszma a fejlődés és a vonalnyitás iskolapéldája: világos minden tisztjét bevonja a támadásba, míg sötét figurái otthon maradnak.",
-  moves: "e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#",
-  c: {
-    0: "Klasszikus királygyalog-nyitás. Világos elfoglalja a centrumot, és egyszerre nyit utat a vezérnek és az f1-futónak.",
-    1: "Sötét szimmetrikusan válaszol, és megveti lábát a centrumban.",
-    2: "A huszár a legjobb mezőjére fejlődik, és rögtön támadja az e5-gyalogot. Ez a nyitás alapelve: tempóval fejlődni.",
-    3: "Philidor-védelem. Szilárd, de passzív: a d6-gyalog bezárja az f8-futót a gyaloglánc mögé, így sötét lassabban fejlődik.",
-    4: "Világos azonnal megnyitja a centrumot. Aki jobban fejlett, annak a nyílt állás kedvez.",
-    5: "Kötés: a futó a huszárt a vezérhez szegezi. Ma 3…exd4-et vagy 3…Hf6-ot tartják jobbnak, mert ez a futó hamarosan elcserélődik, és sötét elveszíti a futópárt.",
-    6: "Világos üt. Most már 4…dxe5 5.Vxd8+ Kxd8 6.Hxe5 után világos gyalogot nyerne, ezért sötét kényszerhelyzetbe kerül.",
-    7: "Szinte kötelező, de fájdalmas: sötét elcseréli egyetlen fejlett tisztjét. Világos vezére ezzel aktív mezőre jut.",
-    8: "A vezér visszaüt és máris a gyenge f7 pontra néz. A Fc4 után matt fenyeget.",
-    9: "Az anyag egyenlő, de a fejlődésben óriási a különbség: világosnak két tisztje aktív, sötétnek egyetlen tisztje sincs játékban.",
-    10: "Fenyegetés: Vxf7 matt! A futó és a vezér együtt célozza f7-et, amit csak a király véd.",
-    11: "A huszár elzárja az f-vonalat, így a vezér nem jut el f7-re. Egyben fejlődik is – jó lépés.",
-    12: "Kettős támadás: a vezér egyszerre fenyegeti a b7-gyalogot és (a c4-futóval együtt) újra f7-et.",
-    13: "A vezér védi f7-et, a b7-gyalogot viszont feladja. Ha 8.Vxb7, akkor 8…Vb4+ vezércserét kényszerít, és sötét védekezése megkönnyebbül.",
-    14: "Morphy nem kapzsi: gyalograblás helyett fejleszt. A támadásban a tempó többet ér egy gyalognál.",
-    15: "Szilárdítja a b5 és d5 mezőket, és helyet csinál a vezérnek – de ez újra gyaloglépés fejlődés helyett. Sötét lemaradása nő.",
-    16: "Újabb kötés: a futó az f6-huszárt a vezérhez szegezi. Világos minden könnyűtisztje aktív.",
-    17: "Sötét el akarja űzni a c4-futót, hogy enyhítse az f7 elleni nyomást. De ezzel megnyitja a vezérszárnyat, miközben a sötét király még középen áll.",
-    18: "Áldozat! Morphy odaadja a huszárt, hogy vonalakat nyisson a középen ragadt király ellen.",
-    19: "Sötét elfogadja. A vonalak megnyílnak.",
-    20: "Sakk! A futó visszaszerez egy gyalogot, és a d7-en keresztül kötést hoz létre a sötét király előtt.",
-    21: "Az egyetlen értelmes védekezés, de a d7-huszár most kötve áll: nem mozdulhat, mert a király sakkba kerülne.",
-    22: "Hosszú sánc: a király biztonságba kerül, a bástya pedig egyetlen lépéssel a nyílt d-vonalra áll, és a kötött d7-huszárt támadja.",
-    23: "Sötét még egy védővel erősíti meg a d7-et.",
-    24: "Bástyaáldozat! Világos a minőséget adja oda, hogy szétverje a sötét védelmet.",
-    25: "Sötét visszaüt, de most a d7-bástya áll kötve a király előtt.",
-    26: "A második bástya is a d-vonalra jön, és ismét a kötött figurát támadja. Világos összes tisztje részt vesz a támadásban, sötét királyszárnya pedig még mindig fejletlen.",
-    27: "A vezér újabb védőként érkezik d7-hez, és közben a b3-vezér cseréjét kínálja.",
-    28: "Világos leüti a bástyát, sakkal. Az anyag most már nem számít – csak az idő.",
-    29: "A huszár kénytelen visszaütni. Ezzel elhagyja az f6 mezőt, és megnyílik a g5–d8 átló.",
-    30: "Vezéráldozat! A vezér sakkot ad b8-on, és arra kényszeríti a huszárt, hogy leüsse – így a huszár nem védheti tovább a d8 mezőt.",
-    31: "Kényszerlépés: a huszár üt, és ezzel elhagyja a d7 mezőt.",
-    32: "Matt! A bástya d8-on ad mattot, a g5-futó védelme alatt. Világos a vezért és egy bástyát feláldozva, két megmaradt tisztjével mattol – a fejlődés és az összjáték tökéletes példája."
-  }},
-{ id: "reti", title: "Réti csapdája", white: "Réti Richárd", black: "Savielly Tartakower", event: "Bécs", year: "1910", result: "1–0", opening: "Caro–Kann-védelem",
-  intro: "Réti Richárd a Magyar Királyságban, Bazinban született, a hipermodern iskola egyik atyja. Ez a rövid játszma minden idők egyik leghíresebb miniatűrje: vezéráldozat, kettős sakk és matt 11 lépésben.",
-  moves: "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Qd3 e5 dxe5 Qa5+ Bd2 Qxe5 O-O-O Nxe4 Qd8+ Kxd8 Bg5+ Kc7 Bd8#",
-  c: {
-    0: "Királygyalog-nyitás: a centrum elfoglalása.",
-    1: "Caro–Kann-védelem. Sötét előbb a c6-gyaloggal előkészíti a …d5-öt, így a centrumért szilárd gyalogszerkezettel harcol.",
-    2: "Világos klasszikus módon két gyaloggal foglalja el a centrumot.",
-    3: "Sötét azonnal megtámadja az e4-gyalogot – ez a Caro–Kann lényege.",
-    4: "A huszár fejlődik és védi e4-et.",
-    5: "Sötét elcseréli a centrumgyalogot, megnyitva a játékot.",
-    6: "Világos huszárral üt vissza, és az e4-en centrális helyre kerül.",
-    7: "Sötét huszárja támadja az e4-huszárt. Csere vagy visszavonulás következik.",
-    8: "Szokatlan lépés! A vezér védi a huszárt és előkészíti a hosszú sáncot. Kockázatos, mert a vezér a d-vonalon áll – később ez lesz a döntő motívum.",
-    9: "Sötét a centrumot nyitja, kihasználva, hogy világos vezére a d-vonalon áll. Ambiciózus, de a saját királya is középen marad.",
-    10: "Világos leüti a gyalogot, és a d-vonal megnyílik.",
-    11: "Sakk, és sötét vissza akarja nyerni a gyalogot az e5-ön.",
-    12: "Futóval védi a sakkot, és közben fejlődik – egyben előkészíti a hosszú sáncot.",
-    13: "Sötét visszanyerte a gyalogot, az anyag egyenlő.",
-    14: "Csapda! Világos hosszú sáncol, és látszólag 'odaadja' az e4-huszárt: a bástya most a d-vonalon áll, a vezér mögött.",
-    15: "Sötét bekapja a csalit. A huszár leütése után azonban a d-vonal végzetessé válik a középen álló sötét király számára.",
-    16: "Vezéráldozat! 9.Vd8+ – a vezért adja oda, hogy a sötét királyt a d-vonalra csalja.",
-    17: "Kényszerlépés: a király kénytelen ütni (a vezért más nem üthette, és Ke7 nem lehetséges).",
-    18: "Kettős sakk! A g5-futó és a d1-bástya egyszerre ad sakkot. Kettős sakk ellen csak a király lépése segít.",
-    19: "Ha 10…Ke8, akkor 11.Bd8 matt. A király c7-re menekül…",
-    20: "Matt! A futó d8-on mattot ad. A d1-bástya fedezi a d-vonalat, a sötét király saját figurái közé szorult. Világos vezért és huszárt áldozva, 11 lépésben nyert."
-  }},
-{ id: "immortal", title: "A Halhatatlan játszma", white: "Adolf Anderssen", black: "Lionel Kieseritzky", event: "London", year: "1851", result: "1–0", opening: "Királycsel, Bryan-ellencsel",
-  intro: "A romantikus sakk korszakának jelképe. Anderssen mindkét bástyáját, a vezérét és egy futót feláldoz, majd három könnyűtiszttel mattot ad.",
-  moves: "e4 e5 f4 exf4 Bc4 Qh4+ Kf1 b5 Bxb5 Nf6 Nf3 Qh6 d3 Nh5 Nh4 Qg5 Nf5 c6 g4 Nf6 Rg1 cxb5 h4 Qg6 h5 Qg5 Qf3 Ng8 Bxf4 Qf6 Nc3 Bc5 Nd5 Qxb2 Bd6 Bxg1 e5 Qxa1+ Ke2 Na6 Nxg7+ Kd8 Qf6+ Nxf6 Be7#",
-  c: {
-    2: "Királycsel: világos gyalogot ajánl fel, hogy megnyissa az f-vonalat és gyorsan támadhasson. A 19. század kedvenc nyitása.",
-    3: "Sötét elfogadja a cselt.",
-    5: "Sakk! A vezér kihasználja, hogy az e1–h4 átló gyenge. Világos király nem sáncolhat többé.",
-    6: "A király kénytelen elmozdulni, de a sötét vezér is kiszolgáltatott helyzetbe kerül, ahol tempót lehet nyerni ellene.",
-    7: "Bryan-ellencsel: sötét gyalogot ad, hogy elterelje a c4-futót az f7-ről.",
-    16: "A huszár f5-ön erős mezőt foglal el, és g7-et támadja.",
-    18: "Világos gyalogjaival űzi a sötét vezért és huszárt, tempót nyerve.",
-    20: "Futóáldozat! Anderssen nem menti a b5-futót, hanem a bástyát hozza fedezékbe. Világos fejlődésbeli előnyét fontosabbnak tartja az anyagnál.",
-    21: "Sötét leüti a futót, egy egész tiszttel több.",
-    30: "Fejlődés: a vezérszárnyi huszár is beavatkozik.",
-    32: "A huszár d5-re ugrik, fenyeget Hc7+-szal és a vezér beszorításával. Sötét kapzsi lépést választ.",
-    33: "Sötét gyalogot üt és mindkét világos bástyát támadja. Anyagilag nyer, de vezére messze kerül a királyától.",
-    34: "Az egyik leghíresebb lépés a sakk történetében: Anderssen nem védi a bástyákat! Mindkettőt feláldozza, hogy a futó elvágja a sötét király útját (f8 mező).",
-    35: "Sötét leüti az egyik bástyát.",
-    36: "Csendes lépés! Az e5-gyalog elzárja a sötét vezért a g7 mező védelmétől. Ez készíti elő a mattot.",
-    37: "Sötét a második bástyát is leüti, sakkal. Anyagilag óriási előnyben van – de már késő.",
-    38: "A király lép, és a sötét sakkok elfogytak.",
-    40: "Sakk! A huszár g7-en üt, a sötét király a d8-ra kényszerül.",
-    41: "Az egyetlen lépés.",
-    42: "Vezéráldozat! A vezér f6-on sakkot ad, és a huszár kénytelen leütni – ezzel nyílik meg az e7 mező a futó előtt.",
-    43: "Kényszerlépés.",
-    44: "Matt! Világos egy futóval és két huszárral mattol, miközben két bástyát, a vezért és egy futót áldozott. A d5-huszár fedezi c7-et és e7-et, a d6-futó elvágja a menekülést."
-  }},
-{ id: "evergreen", title: "Az Örökzöld játszma", white: "Adolf Anderssen", black: "Jean Dufresne", event: "Berlin", year: "1852", result: "1–0", opening: "Evans-csel",
-  intro: "Steinitz nevezte el 'örökzöld babérnak Anderssen koszorújában'. A csúcspont egy gyönyörű áldozatsorozat, amely kettős sakkal zárul.",
-  moves: "e4 e5 Nf3 Nc6 Bc4 Bc5 b4 Bxb4 c3 Ba5 d4 exd4 O-O d3 Qb3 Qf6 e5 Qg6 Re1 Nge7 Ba3 b5 Qxb5 Rb8 Qa4 Bb6 Nbd2 Bb7 Ne4 Qf5 Bxd3 Qh5 Nf6+ gxf6 exf6 Rg8 Rad1 Qxf3 Rxe7+ Nxe7 Qxd7+ Kxd7 Bf5+ Ke8 Bd7+ Kf8 Bxe7#",
-  c: {
-    6: "Evans-csel: világos gyalogot áldoz, hogy tempót nyerve felépítse a c3–d4 centrumot.",
-    7: "Sötét elfogadja a cselt.",
-    10: "A centrum megnyitása: világos fejlődési előnye így érvényesülhet.",
-    12: "Sánc: a király biztonságban, a bástya hamarosan a nyílt vonalra kerül.",
-    20: "A futó a hosszú átlón elvágja a sötét király útját – sötét nem tud sáncolni.",
-    32: "Huszáráldozat! A g-vonal megnyílik, és a sötét király tartósan középen ragad.",
-    36: "Az egyik leghíresebb csendes lépés: világos nem védekezik a …Vxf3 fenyegetés ellen, hanem a d-vonalra hozza a bástyát. Sötét leüti a huszárt, de a támadás gyorsabb.",
-    37: "Sötét üt, és saját matt-fenyegetést állít fel a g-vonalon. Világosnak sakkokkal kell nyernie.",
-    38: "Sakk! A bástya áldozza magát, hogy elterelje a huszárt az e7-ről.",
-    40: "Vezéráldozat! A vezér d7-en sakkot ad, a király kénytelen leütni.",
-    42: "Kettős sakk: a f5-futó és a d1-bástya egyszerre ad sakkot.",
-    44: "Sakk – a király a f8-ra kényszerül.",
-    46: "Matt! A futó e7-en mattot ad. A f6-gyalog és a futók hálója zárja körbe a királyt."
-  }},
-{ id: "century", title: "Az évszázad játszmája", white: "Donald Byrne", black: "Bobby Fischer", event: "New York, Rosenwald-emlékverseny", year: "1956", result: "0–1", opening: "Grünfeld-védelem (Hf3 lépésrenddel)",
-  intro: "A 13 éves Fischer egy vezéráldozattal és egy 'malom' sakksorozattal semmisíti meg az erős Byrne-t. A játszma a modern dinamikus sakk mintapéldája.",
-  moves: "Nf3 Nf6 c4 g6 Nc3 Bg7 d4 O-O Bf4 d5 Qb3 dxc4 Qxc4 c6 e4 Nbd7 Rd1 Nb6 Qc5 Bg4 Bg5 Na4 Qa3 Nxc3 bxc3 Nxe4 Bxe7 Qb6 Bc4 Nxc3 Bc5 Rfe8+ Kf1 Be6 Bxb6 Bxc4+ Kg1 Ne2+ Kf1 Nxd4+ Kg1 Ne2+ Kf1 Nc3+ Kg1 axb6 Qb4 Ra4 Qxb6 Nxd1 h3 Rxa2 Kh2 Nxf2 Re1 Rxe1 Qd8+ Bf8 Nxe1 Bd5 Nf3 Ne4 Qb8 b5 h4 h5 Ne5 Kg7 Kg1 Bc5+ Kf1 Ng3+ Ke1 Bb4+ Kd1 Bb3+ Kc1 Ne2+ Kb1 Nc3+ Kc1 Rc2#",
-  c: {
-    9: "Sötét a centrumban üt vissza: Grünfeld-szerű szerkezet, ahol sötét a világos centrumot alakzataival támadja.",
-    20: "Világos kötést hoz létre, de a király még középen áll – ezt Fischer ki fogja használni.",
-    21: "Zseniális lépés! A huszár a c3-huszárt támadja; ha világos üt, a vezér a e7-ről és a d-vonalról nem tud egyszerre védekezni.",
-    25: "Sötét gyalogot nyer, és megnyitja az e-vonalat a világos király ellen.",
-    27: "Fischer nem menti az e7-en lévő bástyát (Fxf8 fenyeget), hanem ellentámadást indít.",
-    33: "Az évszázad lépése: Fischer feláldozza a vezérét! A futó a c4-futót támadja, és megnyitja a 'malom' sorozatot.",
-    34: "Byrne elfogadja a vezért.",
-    35: "Sakk! Kezdődik a malom: a futó és a huszár felváltva ad sakkokat, és sorra szedi a világos figurákat.",
-    37: "Felfedett sakk a malom elején.",
-    39: "A huszár leüti a d4-gyalogot, sakkal.",
-    43: "A huszár visszatér c3-ra, és a d1-bástyát támadja.",
-    45: "Fischer végre visszaüti a vezért. Összesítés: bástya, két futó és huszár a vezérért – sötét messze előnyben van.",
-    49: "Sötét a bástyát is begyűjti.",
-    81: "Matt! Fischer a két futóval, a huszárral és a bástyával koordinált hálót sző a világos király köré."
-  }}
-];
-
 // ---------- Segédfüggvények ----------
 const HU = { K: "K", Q: "V", R: "B", B: "F", N: "H" };
 const huSan = s => s.replace(/^[KQRBN]/, m => HU[m]).replace(/=([QRBN])/, (_, p) => "=" + HU[p]);
@@ -386,7 +281,7 @@ const store = {
 };
 
 // settings.properties tartalma (a szerver /api/settings adja); statikus hostingon az alapértékek érvényesek
-const CFG = { "ai.maxWords": 90, "replay.autoStart": true, "replay.stepSeconds": 3, "replay.loop": true, "speech.lang": "hu-HU", "speech.rate": 1, "board.moveArrow": true, "board.engineArrow": false, "speech.autoStart": false, "speech.blinkSquares": true, "animation.enabled": true, "animation.ms": 900, "play.stepSeconds": 3 };
+const CFG = { "ai.maxWords": 90, "replay.autoStart": true, "replay.stepSeconds": 3, "replay.loop": true, "speech.lang": "hu-HU", "speech.rate": 1, "board.moveArrow": true, "board.engineArrow": false, "speech.autoStart": false, "speech.blinkSquares": true, "animation.enabled": true, "animation.ms": 900, "play.stepSeconds": 3, "translate.auto": true, "translate.maxChars": 20000 };
 let game = null;        // { meta, sans[], fens[], comments{} }
 let ply = 0;            // hány lépés történt meg (0 = kiinduló állás)
 let flipped = false;
@@ -499,7 +394,7 @@ function renderMoves() {
     if (i % 2 === 0) { const n = document.createElement("div"); n.className = "no"; n.textContent = (i / 2 + 1) + "."; box.append(n); }
     const d = document.createElement("div"); d.className = "mv"; d.tabIndex = 0; d.dataset.ply = i + 1;
     const dot = document.createElement("span"); dot.className = "dot"; dot.id = "dot" + (i + 1);
-    const t = document.createElement("span"); t.textContent = huSan(s);
+    const t = document.createElement("span"); t.textContent = huSan(s) + (game.meta.nag?.[i] || "");
     d.append(dot, t);
     if (game.comments[i]) { const c = document.createElement("span"); c.className = "has-c"; c.textContent = "✎"; d.append(c); }
     d.onclick = () => go(i + 1);
@@ -656,22 +551,16 @@ async function renderComment() {
   const cbox = $("comment");
   if (ply === 0) {
     $("mvName").textContent = "Kiinduló állás";
-    cbox.className = "comment"; cbox.innerHTML = "";
-    const p = document.createElement("p"); p.textContent = game.meta.intro || "Lépj előre a ▶ gombbal vagy a jobbra nyíllal."; cbox.append(p);
     $("engineLine").textContent = "";
     $("aiBox").hidden = true;
   } else {
     const i = ply - 1;
-    $("mvName").textContent = `${Math.floor(i / 2) + 1}.${i % 2 ? "…" : " "}${huSan(game.sans[i])}`;
-    const txt = game.comments[i];
-    cbox.innerHTML = "";
-    if (txt) { cbox.className = "comment"; const p = document.createElement("p"); p.textContent = txt; cbox.append(p); }
-    else { cbox.className = "comment empty"; cbox.textContent = "Ehhez a lépéshez nincs előre megírt kommentár. Kérj részletes elemzést az AI-tól."; }
+    $("mvName").textContent = `${Math.floor(i / 2) + 1}.${i % 2 ? "…" : " "}${huSan(game.sans[i])}${game.meta.nag?.[i] || ""}`;
     $("aiBox").hidden = !sampleFn;
     const cached = store.get(aiKey());
     if (cached) renderMd($("aiOut"), cached);
   }
-  $("speakCmtBtn").hidden = cbox.classList.contains("empty") || !cbox.innerText.trim();
+  renderCommentBody();
   if (!engineReady) { $("engineLine").textContent = engine ? "Motor betöltése…" : ""; }
   // motor (betöltés után a játszma újratöltődik, így ez az ág akkor fut le)
   if (engineReady) {
@@ -868,8 +757,7 @@ function sayMove(mk) {
   drawArrow(mk.from + mk.to, true); // a kimondott/elemzett lépés piros nyíllal
   animateMove(mk.from, mk.to, captured, Number(CFG["animation.ms"]) || 900);
 }
-// Felolvasás lépésekre szeletelve: minden lépés a rá következő szöveggel külön felolvasás, és az indulásakor jelenik meg
-// a piros lépés a táblán. Így a szinkron nem függ a böngésző szóhatár-eseményeitől (amiket sok hang nem küld).
+// Felolvasás: mondatonként egy felolvasás (folyamatos hang), a lépések és a mezővillogás szóhatár-eseményekkel vagy becsült időzítéssel szinkronban.
 let speechRun = 0, speechOn = false; // speechRun: a régi felolvasás eseménykezelői ne zavarják az újat
 function stopSpeech(restore = true) {
   speechRun++; speechOn = false; blinkSquares = [];
@@ -881,37 +769,43 @@ function stopSpeech(restore = true) {
 function startSpeech(source = "ai") { // "ai": az AI-elemzés (lépések + piros villogás), "comment": a kommentár (az állás áll, sárga villogás)
   if (!("speechSynthesis" in window)) { $("aiNote").textContent = "A böngésző nem támogatja a felolvasást."; return; }
   const fromComment = source === "comment";
-  const text = $(fromComment ? "comment" : "aiOut").innerText; if (!text.trim()) return;
+  const text = fromComment ? ($("comment").querySelector("p.cmt")?.innerText || "") : $("aiOut").innerText; if (!text.trim()) return;
   stopReplay(false); stopAutoplay(); stopSpeech(false);
   const run = ++speechRun; speechOn = true; blinkKind = fromComment ? "yellow" : "red";
   const sp = buildSpeech(text, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]);
-  // vágási pontok: minden lépésnél és mezőhivatkozásnál új szelet indul, és annak indulásakor lefut a hozzá tartozó művelet
-  // kommentárnál az állás nem mozdul: a lépések csak a célmezőjüket villogtatják
-  const cuts = fromComment ? [] : sp.marks.map(m => ({ pos: m.start, act: () => sayMove(m) }));
-  const refs = fromComment ? [...sp.squares, ...sp.marks.map(m => ({ start: m.start, end: m.end, sq: m.to }))].sort((a, b) => a.start - b.start) : sp.squares;
-  if (CFG["speech.blinkSquares"] !== false) for (const q of refs) {
-    cuts.push({ pos: q.start, act: () => addBlink(q.sq) });
-    const e = /[.!?;:]/.exec(sp.text.slice(q.end)); // a mondat végén elhallgat a villogás
-    cuts.push({ pos: e ? q.end + e.index + 1 : sp.text.length, act: () => setBlink([]), clear: true });
-  }
-  cuts.sort((x, y) => x.pos - y.pos || (y.clear ? 1 : 0) - (x.clear ? 1 : 0)); // azonos helyen előbb a törlés
-  const pts = [0, ...new Set(cuts.map(c => c.pos).filter(p => p > 0 && p < sp.text.length)), sp.text.length];
-  const segs = []; let pending = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const t = sp.text.slice(pts[i], pts[i + 1]);
-    pending.push(...cuts.filter(c => c.pos === pts[i]).map(c => c.act));
-    if (t.trim()) { segs.push({ text: t, acts: pending }); pending = []; } // üres szelet műveletei a következőre szállnak
-  }
+  // műveletek a szövegben: AI-nél a lépések és a mezők; kommentárnál az állás nem mozdul, a lépések csak a célmezőjüket villogtatják
+  const acts = fromComment ? [] : sp.marks.map(m => ({ pos: m.start, act: () => sayMove(m) }));
+  const refs = fromComment ? [...sp.squares, ...sp.marks.map(m => ({ start: m.start, sq: m.to }))] : sp.squares;
+  if (CFG["speech.blinkSquares"] !== false) refs.forEach(q => acts.push({ pos: q.start, act: () => addBlink(q.sq) }));
+  // Mondatonként egy felolvasás: a mondaton belül nincs vágás, így a hang folyamatos (a mondatok között természetes a szünet).
+  const sents = []; const re = /[^.!?]+[.!?]*\s*/g; let mm;
+  while ((mm = re.exec(sp.text))) if (mm[0].trim()) sents.push({ text: mm[0], start: mm.index, end: mm.index + mm[0].length });
   const lang = String(CFG["speech.lang"]);
   const voice = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
   if (!voice) $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
   $(fromComment ? "speakCmtBtn" : "speakBtn").textContent = "⏹ Leállítás";
-  segs.forEach((g, i) => {
-    const u = new SpeechSynthesisUtterance(g.text);
+  // A mondaton belüli lépéseket/mezőket a szóhatár-események (charIndex) vezérlik; ha a hang nem küld ilyet,
+  // becsült időzítés szerint jelennek meg (a korábbi mondatok mért idejéből tanult ms/karakter alapján).
+  let boundarySeen = false, msPerChar = 75;
+  sents.forEach((s, i) => {
+    const mine = acts.filter(a => a.pos >= s.start && a.pos < s.end).sort((a, b) => a.pos - b.pos).map(a => ({ off: a.pos - s.start, act: a.act, done: false }));
+    const fire = upTo => mine.forEach(a => { if (!a.done && a.off <= upTo) { a.done = true; a.act(); } });
+    const u = new SpeechSynthesisUtterance(s.text);
     u.lang = lang; u.rate = Number(CFG["speech.rate"]) || 1; if (voice) u.voice = voice;
-    u.onstart = () => { if (run === speechRun) g.acts.forEach(f => f()); };
+    let t0 = 0;
+    u.onstart = () => {
+      if (run !== speechRun) return;
+      t0 = performance.now(); setBlink([]); // az előző mondat villogása véget ér
+      mine.forEach(a => setTimeout(() => { if (run === speechRun && !boundarySeen) fire(a.off); }, a.off * msPerChar));
+    };
+    u.onboundary = e => { if (run !== speechRun) return; boundarySeen = true; fire(e.charIndex); };
+    u.onend = () => {
+      if (run !== speechRun) return;
+      fire(Infinity); // ami addig nem jelent meg, a mondat végére mindenképp látszódjon
+      if (s.text.length >= 20) msPerChar = 0.5 * msPerChar + 0.5 * ((performance.now() - t0) / s.text.length); // rövid cím/mondat nem torzítja a becslést
+      if (i === sents.length - 1) stopSpeech(); // a végén vissza az eredeti állásra
+    };
     u.onerror = () => { if (run === speechRun) stopSpeech(); };
-    if (i === segs.length - 1) u.onend = () => { if (run === speechRun) stopSpeech(); }; // a végén vissza az eredeti állásra
     speechSynthesis.speak(u);
   });
 }
@@ -953,6 +847,83 @@ function startAutoplay() {
   $("bPlay").textContent = "⏸ Játszma";
   autoTimer = setInterval(() => { if (ply >= game.sans.length) { stopAutoplay(); return; } go(ply + 1, true); }, (Number(CFG["play.stepSeconds"]) || 3) * 1000);
 }
+// ---------- Kommentárok automatikus fordítása magyarra ----------
+// Tokenkímélés: csak a megnyitott játszma nem magyar kommentárjait fordítja, szövegenként egyszer (szerver- és böngészőgyorsítótár),
+// és ha a játszma kommentárjai túl hosszúak (translate.maxChars), csak az aktuális lépés környékét, lépésenként.
+const trCache = {}; // eredeti szöveg → magyar fordítás (localStorage tükörrel: fordit:<hash>)
+let proxyAI = false, trChain = Promise.resolve(), showOrig = false;
+const trOf = t => { if (!(t in trCache)) trCache[t] = store.get("fordit:v2:" + hash(t)) || ""; return trCache[t]; };
+const gameTexts = g => { // a játszma lefordítandó (nem magyar, még nem fordított) kommentárjai
+  const all = Object.values(g.comments); if (g.meta.introSrc) all.push(g.meta.introSrc);
+  return [...new Set(all)].filter(t => PGN.needsTranslation(t) && !trOf(t));
+};
+function translateTexts(list, g) { // sorba állítva, hogy ne fusson két fordítás egyszerre
+  trChain = trChain.then(async () => {
+    const todo = list.filter(t => !trOf(t)); if (!todo.length) return;
+    const note = $("trNote"), chunks = []; let cur = [], len = 0, done = 0, tok = 0, cost = 0;
+    for (const t of todo) { if (len + t.length > 5000 && cur.length) { chunks.push(cur); cur = []; len = 0; } cur.push(t); len += t.length; }
+    if (cur.length) chunks.push(cur);
+    for (const ch of chunks) {
+      if (g === game) note.textContent = `Fordítás magyarra… ${done}/${todo.length}`;
+      try {
+        const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: ch }) });
+        if (!r.ok) throw new Error(r.status);
+        const out = await r.json();
+        ch.forEach((t, i) => { if (out.translations[i]) { trCache[t] = out.translations[i]; store.set("fordit:v2:" + hash(t), out.translations[i]); } });
+        tok += (out.usage?.prompt || 0) + (out.usage?.output || 0); cost += out.usage?.cost || 0; done += ch.length;
+        if (g === game) renderCommentBody(); // a már megérkezett fordítás azonnal látszik
+      } catch { if (g === game) note.textContent = "A fordítás nem sikerült, a kommentárok eredetiben látszanak."; return; }
+    }
+    if (g === game) note.textContent = `Lefordítva: ${todo.length} kommentár` + (tok ? ` · ${tok} token ≈ ${fmtUsd(cost)}` : "") + " (a fordítás megmarad, újra nem kerül tokenbe)";
+  });
+  return trChain;
+}
+function autoTranslate() {
+  if (!proxyAI || CFG["translate.auto"] === false || !game) return;
+  const g = game, todo = gameTexts(g);
+  if (!todo.length) { $("trNote").textContent = ""; return; }
+  g.lazyTr = todo.reduce((n, t) => n + t.length, 0) > (Number(CFG["translate.maxChars"]) || 20000);
+  if (g.lazyTr) translateNear(); else translateTexts(todo, g);
+}
+function translateNear() { // hosszú játszma: az aktuális és a következő 2 lépés kommentárja
+  if (!game?.lazyTr || !proxyAI) return;
+  const list = [];
+  for (let k = Math.max(0, ply - 1); k <= ply + 1; k++) { const t = game.comments[k]; if (t && PGN.needsTranslation(t) && !trOf(t) && !list.includes(t)) list.push(t); }
+  if (ply === 0 && game.meta.introSrc && PGN.needsTranslation(game.meta.introSrc) && !trOf(game.meta.introSrc)) list.push(game.meta.introSrc);
+  if (list.length) translateTexts(list, game);
+}
+
+// Változat szövege (az i. félmenet alternatívája): 7. Vb3 Hf6 8. …
+function fmtVar(i, plies) {
+  return plies.map((p, k) => { const n = i + k, no = Math.floor(n / 2) + 1; return (n % 2 === 0 ? no + ". " : k === 0 ? no + "… " : "") + huSan(p.san) + (p.nag || ""); }).join(" ");
+}
+// A kommentárkártya tartalma az aktuális félmenethez (fordítás megérkezésekor újrahívható)
+function renderCommentBody() {
+  const cbox = $("comment"); cbox.innerHTML = "";
+  const i = ply - 1, src = ply === 0 ? (game.meta.introSrc || "") : (game.comments[i] || "");
+  const para = txt => { const p = document.createElement("p"); p.className = "cmt"; p.textContent = txt; cbox.append(p); };
+  const vs = ply > 0 ? game.meta.vars?.[i] : null;
+  if (ply === 0 && !src) { cbox.className = "comment"; para(game.meta.intro || "Lépj előre a ▶ gombbal vagy a jobbra nyíllal."); }
+  else if (src) {
+    cbox.className = "comment";
+    const tr = PGN.needsTranslation(src) ? trOf(src) : ""; // magyar szöveghez soha nem mutatunk (esetleg régi, téves) fordítást
+    para(tr && !showOrig ? tr : src);
+    if (tr) {
+      const cap = document.createElement("div"); cap.className = "tr-cap"; cap.append("🌐 AI-fordítás · ");
+      const b = document.createElement("button"); b.className = "orig"; b.textContent = showOrig ? "magyar fordítás mutatása" : "eredeti mutatása";
+      b.onclick = () => { showOrig = !showOrig; renderCommentBody(); };
+      cap.append(b); cbox.append(cap);
+    }
+  } else if (vs?.length) cbox.className = "comment";
+  else { cbox.className = "comment empty"; cbox.textContent = "Ehhez a lépéshez nincs előre megírt kommentár. Kérj részletes elemzést az AI-tól."; }
+  if (vs?.length) {
+    const d = document.createElement("div"); d.className = "vars";
+    vs.forEach(v => { const p = document.createElement("p"); p.textContent = "Változat: " + fmtVar(i, v); d.append(p); });
+    cbox.append(d);
+  }
+  $("speakCmtBtn").hidden = cbox.classList.contains("empty") || !cbox.innerText.trim();
+}
+
 // ---------- Navigáció ----------
 function go(p, auto = false) {
   p = Math.max(0, Math.min(game.sans.length, p));
@@ -960,7 +931,7 @@ function go(p, auto = false) {
   const step = ply >= 0 && p === ply + 1 && p > 0 ? lastMoveSquares(p) : null; // egy lépés előre: animáljuk
   const captured = step ? pieceHtmlAt(step[1]) : "";
   ply = p;
-  renderBoard(); markCurrent(); renderComment();
+  renderBoard(); markCurrent(); renderComment(); translateNear();
   if (step?.length) animateMove(step[0], step[1], captured, Number(CFG["animation.ms"]) || 900);
   $("bStart").disabled = $("bPrev").disabled = ply === 0;
   $("bEnd").disabled = $("bNext").disabled = ply === game.sans.length;
@@ -974,42 +945,171 @@ function loadGame(meta, sans, startPly = 0) {
   parts.forEach(([k, v], idx) => { const b = document.createElement("b"); b.textContent = v; meta$.append(k + ": ", b, idx < parts.length - 1 ? " · " : ""); });
   ply = -1;
   renderMoves(); go(startPly);
+  autoTranslate(); // a megnyitott játszma kommentárjainak automatikus fordítása (tokenkímélő, gyorsítótáras)
   // háttérben az egész játszmát kiértékeli a lépésjelölésekhez
   if (engineReady) game.fens.forEach(f => analyse(f).then(() => { for (let p = 1; p <= game.sans.length; p++) if (evalCache[game.fens[p - 1]] && evalCache[game.fens[p]]) classifyPly(p).then(refreshDots); }));
 }
 
 // ---------- PGN import ----------
-function cleanPgn(t) {
-  let s = t.replace(/\{[^}]*\}/g, " ").replace(/;[^\n]*/g, " ").replace(/\$\d+/g, " ");
-  let prev; do { prev = s; s = s.replace(/\([^()]*\)/g, " "); } while (s !== prev);
-  return s;
+// A PGN-feldolgozó (pgn.js) eredményéből játszmarekord: lépések szabályosság-ellenőrzéssel, kommentárok, minősítések, változatok
+function toGameRecord(pg) {
+  const h = pg.h;
+  if (h.FEN || (h.Variant && !/standard/i.test(h.Variant))) return { error: "nem szokásos kezdőállás vagy játékváltozat (csak a normál sakk támogatott)" };
+  const ch = new Chess(), sans = [], c = {}, nag = {}, vars = {}; let warn = "";
+  for (const p of pg.plies) {
+    const m = ch.move(p.san, { sloppy: true });
+    if (!m) { warn = `szabálytalan lépés a(z) ${sans.length + 1}. félmenetnél (${p.san}), addig töltöttem be`; break; }
+    const i = sans.length; sans.push(m.san);
+    if (p.comment) c[i] = p.comment;
+    if (p.nag) nag[i] = p.nag;
+    if (p.vars.length) vars[i] = p.vars; // alternatívák erre a lépésre
+  }
+  if (!sans.length) return { error: warn || "nincs benne lépés" };
+  const year = (h.Date || "").slice(0, 4).replace(/\?/g, "");
+  const meta = {
+    id: "pgn-" + hash(sans.join(" ") + "|" + (h.White || "") + "|" + (h.Black || "") + "|" + (h.Date || "")),
+    title: h.Title || `${h.White || "Világos"} – ${h.Black || "Sötét"}`, white: h.White, black: h.Black,
+    event: [h.Event, h.Site].filter(x => x && x !== "?").join(", "), year, result: h.Result || pg.result, opening: h.Opening || h.ECO,
+    intro: pg.intro || "Betöltött játszma. Lépj előre, és kérj részletes magyar elemzést bármelyik lépéshez.", introSrc: pg.intro || "",
+    c, nag, vars, warn
+  };
+  return { meta, sans, raw: pg.raw };
+}
+function registerGame(rec, persist) {
+  const meta = rec.meta;
+  if (![...$("gameSel").options].some(o => o.value === meta.id)) $("gameSel").add(new Option(meta.title + (meta.year ? ` (${meta.year})` : ""), meta.id));
+  imported[meta.id] = { meta, sans: rec.sans };
+  if (persist) store.set("pgn:" + meta.id, rec.raw); // beillesztett/fájlból betöltött játszmák megmaradnak újraindítás után
+}
+const MAX_IMPORT = 300;
+function importPgnText(raw, { persist = true, open = true } = {}) {
+  const parts = PGN.splitPgn(raw), recs = [], errs = [];
+  for (const g of parts.slice(0, MAX_IMPORT)) {
+    const r = toGameRecord(PGN.parseGame(g));
+    if (r.error) errs.push(r.error); else recs.push(r);
+  }
+  recs.forEach(r => registerGame(r, persist));
+  if (recs.length && open) { $("gameSel").value = recs[0].meta.id; loadGame(recs[0].meta, recs[0].sans); }
+  return { count: recs.length, errs, extra: Math.max(0, parts.length - MAX_IMPORT), warn: recs.filter(r => r.meta.warn).length };
+}
+function reportImport(r) {
+  const e = $("pgnErr"), n = $("importNote"); e.textContent = n.textContent = "";
+  if (!r.count) { e.textContent = "Nem sikerült beolvasni: " + (r.errs[0] || "nincs felismerhető játszma") + "."; return; }
+  const bits = [`${r.count} játszma betöltve`];
+  if (r.extra) bits.push(`${r.extra} további kimaradt (legfeljebb ${MAX_IMPORT}/import)`);
+  if (r.errs.length) bits.push(`${r.errs.length} nem olvasható`);
+  if (r.warn) bits.push(`${r.warn} részleges (szabálytalan lépés)`);
+  n.textContent = bits.join(" · ");
+  $("importBox").open = r.count === 1 && !r.errs.length && !r.warn ? false : true;
 }
 $("pgnLoad").onclick = () => {
-  const raw = $("pgnIn").value.trim(); $("pgnErr").textContent = "";
+  const raw = $("pgnIn").value.trim();
   if (!raw) { $("pgnErr").textContent = "Illessz be egy PGN szöveget."; return; }
-  const ch = new Chess();
-  if (!ch.load_pgn(cleanPgn(raw), { sloppy: true })) { $("pgnErr").textContent = "Nem sikerült beolvasni. Ellenőrizd, hogy teljes PGN-t másoltál-e (fejléc + lépések)."; return; }
-  const h = ch.header(), sans = ch.history();
-  if (!sans.length) { $("pgnErr").textContent = "A PGN nem tartalmaz lépéseket."; return; }
-  const meta = { id: "pgn-" + hash(sans.join(" ")), title: `${h.White || "Világos"} – ${h.Black || "Sötét"}`, white: h.White, black: h.Black, event: [h.Event, h.Site].filter(x => x && x !== "?").join(", "), year: (h.Date || "").slice(0, 4).replace(/\?/g, ""), result: h.Result, opening: h.Opening || h.ECO, intro: "Saját betöltött játszma. Lépj előre, és kérj részletes magyar elemzést bármelyik lépéshez.", c: {} };
-  let opt = [...$("gameSel").options].find(o => o.value === meta.id);
-  if (!opt) { opt = new Option(meta.title + (meta.year ? ` (${meta.year})` : ""), meta.id); $("gameSel").add(opt); }
-  imported[meta.id] = { meta, sans };
-  store.set("pgn:" + meta.id, raw);
-  $("gameSel").value = meta.id;
-  loadGame(meta, sans);
-  $("importBox").open = false;
+  reportImport(importPgnText(raw));
 };
+$("pgnFile").onchange = async ev => { // .pgn fájl(ok) kiválasztása a gépről
+  const files = [...ev.target.files]; if (!files.length) return;
+  let all = "";
+  for (const f of files) {
+    const buf = await f.arrayBuffer();
+    let t = new TextDecoder("utf-8").decode(buf);
+    if (t.includes("�")) t = new TextDecoder("latin1").decode(buf); // régi PGN-fájlok (pl. PGN Mentor) Latin-1 kódolásúak
+    all += "\n\n" + t;
+  }
+  ev.target.value = "";
+  reportImport(importPgnText(all));
+};
+// Újraindítás után a korábban betöltött játszmák visszatöltése (a kulcsok: pgn:<azonosító>)
+function restoreImported() {
+  try {
+    for (let k = 0; k < localStorage.length; k++) {
+      const key = localStorage.key(k);
+      if (key && key.startsWith("pgn:")) importPgnText(localStorage.getItem(key) || "", { persist: false, open: false });
+    }
+  } catch { /* nincs tárhely-hozzáférés */ }
+}
+
+// ---------- Játszmakönyvtár: a games mappa .pgn fájljai (a szerver indexeli), keresés névre/évre/eseményre vagy regexszel ----------
+let library = [], libShown = [], libCur = "";
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""); // ékezet- és kisbetű-független
+function lev1(a, b) { // legfeljebb 1 betű eltérés (elírás: Portish ≈ Portisch)
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : b.slice(i + 1) === a.slice(i);
+}
+const rowText = r => norm([r.title, r.white, r.black, r.year, r.event, r.site, r.eco, r.result].filter(Boolean).join(" "));
+function rowMatcher(q) {
+  q = q.trim(); if (!q) return () => true;
+  const rx = /^\/(.+)\/([a-z]*)$/.exec(q); // /Larsen.*Portisch.*1975/i – teljes regex
+  if (rx) {
+    try {
+      const re = new RegExp(rx[1], rx[2].includes("i") ? rx[2] : rx[2] + "i");
+      return r => re.test([r.title, r.white, r.black, r.year, r.event, r.site, r.eco].join(" ")) || re.test(rowText(r));
+    } catch { return () => false; }
+  }
+  const toks = q.split(/[-–,;\s]+/).map(norm).filter(Boolean); // Larsen - Portisch - 1975, Linares: sorrendfüggetlen, mind szerepel
+  return r => {
+    const h = rowText(r), words = h.split(/[^\p{L}\p{N}]+/u);
+    return toks.every(t => h.includes(t) || (t.length >= 5 && words.some(w => w.length >= 4 && lev1(w, t))));
+  };
+}
+function renderLibrary() {
+  const m = rowMatcher($("libQ").value);
+  libShown = library.filter(m);
+  const box = $("libList"); box.innerHTML = "";
+  libShown.slice(0, 200).forEach(r => {
+    const d = document.createElement("div"); d.className = "lib-item" + (r.id === libCur ? " cur" : ""); d.tabIndex = 0; d.role = "option";
+    const a = document.createElement("span"); a.textContent = (r.title ? r.title + " · " : "") + `${r.white || "?"} – ${r.black || "?"}`;
+    const b = document.createElement("span"); b.className = "lib-meta"; b.textContent = [r.year, r.event, r.result].filter(Boolean).join(" · ");
+    d.append(a, b);
+    d.onclick = () => loadFromLibrary(r);
+    d.onkeydown = e => { if (e.key === "Enter") loadFromLibrary(r); };
+    box.append(d);
+  });
+  $("libCount").textContent = library.length ? `(${libShown.length === library.length ? library.length : libShown.length + "/" + library.length})` : "";
+  $("libNote").textContent = !library.length ? "Még nincs játszma: tedd a letöltött .pgn fájlokat a games mappába, majd kattints a ↻ gombra."
+    : libShown.length > 200 ? `Az első 200 találat látszik, szűkítsd a keresést.` : !libShown.length ? "Nincs találat." : "";
+}
+async function loadLibrary() {
+  try {
+    const res = await fetch("/api/library"); if (!res.ok) return;
+    const l = await res.json();
+    library = l.games || [];
+    $("libCard").hidden = false;
+    renderLibrary();
+    if (l.errors?.length) $("libNote").textContent += " Olvasási hiba: " + l.errors.join("; ");
+    openDefaultGame();
+  } catch { /* nincs szerver (statikus hosting): a könyvtár nem érhető el */
+    if (game?.meta.id === "ures") { game.meta.intro = "A játszmakönyvtár csak a helyi szerverrel (node server.js) érhető el. Illessz be egy PGN-t lent, vagy válassz .pgn fájlt."; renderCommentBody(); }
+  }
+}
+function openDefaultGame() { // induláskor: az utoljára nézett könyvtári játszma, különben az Operajátszma, különben az első
+  if (game?.meta.id !== "ures") return;
+  const row = library.find(r => r.id === store.get("utolsoLib")) || library.find(r => /operaj/i.test(r.title || "")) || library[0];
+  if (row) loadFromLibrary(row, true);
+  else { game.meta.intro = "Nincs játszma: tedd a letöltött .pgn fájlokat a games mappába (↻), vagy illessz be egy PGN-t lent."; renderCommentBody(); }
+}
+async function loadFromLibrary(r, restore = false) {
+  $("libNote").textContent = "Betöltés…";
+  try {
+    const res = await fetch(`/api/library/game?f=${encodeURIComponent(r.f)}&n=${r.n}`);
+    if (!res.ok) throw new Error(res.status);
+    const out = importPgnText((await res.json()).pgn, { persist: false });
+    libCur = r.id; store.set("utolsoLib", r.id); renderLibrary();
+    if (restore && out.count && game.meta.id === lastId) go(lastPly); // újraindítás után ugyanoda lép, ahol abbahagytad
+    if (!out.count) $("libNote").textContent = "A játszmát nem sikerült beolvasni: " + (out.errs[0] || "ismeretlen hiba") + ".";
+    else if (out.warn) $("libNote").textContent = "Részlegesen töltődött be (szabálytalan lépés a PGN-ben).";
+  } catch { $("libNote").textContent = "A betöltés nem sikerült. Frissítsd a listát (↻)."; }
+}
+$("libQ").addEventListener("input", renderLibrary);
+$("libRefresh").onclick = loadLibrary;
 const imported = {};
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); }
 
 // ---------- Indítás ----------
 const sel = $("gameSel");
-GAMES.forEach(g => sel.add(new Option(`${g.title} – ${g.white} vs. ${g.black.split(" és ")[0]} (${g.year})`, g.id)));
-sel.onchange = () => {
-  const g = GAMES.find(x => x.id === sel.value);
-  if (g) loadGame(g, g.moves.split(" ")); else if (imported[sel.value]) loadGame(imported[sel.value].meta, imported[sel.value].sans);
-};
+sel.onchange = () => { if (imported[sel.value]) loadGame(imported[sel.value].meta, imported[sel.value].sans); };
 $("bStart").onclick = () => go(0);
 $("bPrev").onclick = () => go(ply - 1);
 $("bNext").onclick = () => go(ply + 1);
@@ -1027,11 +1127,11 @@ document.addEventListener("keydown", e => {
   else if (e.key === "End") go(game.sans.length);
 });
 
-let start = GAMES[0], startPly = 10;
-const last = store.get("utolso");
-if (last) { const [id, p] = last.split(":"); const g = GAMES.find(x => x.id === id); if (g) { start = g; startPly = +p || 0; } }
-sel.value = start.id;
-loadGame(start, start.moves.split(" "), startPly);
+restoreImported();
+const last = store.get("utolso") || ""; // "<játszma-azonosító>:<lépés>" (a betöltések előtt kiolvasva, mert a betöltés felülírja)
+const lastId = last.split(":")[0], lastPly = +last.split(":")[1] || 0;
+if (imported[lastId]) { sel.value = lastId; loadGame(imported[lastId].meta, imported[lastId].sans, lastPly); }
+else loadGame({ id: "ures", title: "–", intro: "A játszmák betöltése…" }, []); // üres tábla, amíg a könyvtár meg nem érkezik
 
 const _ready = setInterval(() => { if (engineReady && game) { clearInterval(_ready); loadGame(game.meta, game.sans, ply); } }, 300);
 initEngine();
@@ -1043,6 +1143,7 @@ initEngine();
   if (!sampleFn) {
     try {
       const st = await (await fetch("/api/status")).json();
+      proxyAI = Boolean(st.ai);
       if (st.ai) sampleFn = async (prompt, { signal, onText } = {}) => {
         const r = await fetch("/api/analyze", { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
         if (!r.ok) throw { code: r.status === 429 ? "rate_limited" : "http_" + r.status };
@@ -1054,6 +1155,7 @@ initEngine();
   }
   if (sampleFn && ply > 0) $("aiBox").hidden = false;
   if (!sampleFn) $("aiNote").textContent = "";
+  loadLibrary(); autoTranslate();
 })();
 </script>
 
