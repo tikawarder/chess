@@ -609,7 +609,7 @@ function inline(node, s) {
     else node.append(document.createTextNode(part));
   });
 }
-async function contextBlock() {
+async function contextBlock(forQuestion = false) {
   const i = ply - 1, m = game.meta;
   const hist = game.sans.slice(0, ply).map((s, j) => (j % 2 === 0 ? (j / 2 + 1) + ". " : "") + huSan(s)).join(" ");
   let eng = "Motoradat nem érhető el.";
@@ -624,7 +624,7 @@ async function contextBlock() {
   }
   return `Játszma: ${m.white} – ${m.black}${m.event ? ", " + m.event : ""}${m.year ? " " + m.year : ""}${m.opening ? ". Megnyitás: " + m.opening : ""}.
 Eddigi lépések (magyar jelöléssel: K=király, V=vezér, B=bástya, F=futó, H=huszár): ${hist}
-Az elemzett lépés: ${Math.floor(i / 2) + 1}. ${i % 2 ? "sötét" : "világos"} lépése: ${huSan(game.sans[i])}
+${forQuestion ? "Az utoljára lejátszott lépés (az állás ez után áll fenn)" : "Az elemzett lépés"}: ${Math.floor(i / 2) + 1}. ${i % 2 ? "sötét" : "világos"} lépése: ${huSan(game.sans[i])}
 FEN a lépés után: ${game.fens[ply]}
 Stockfish adatok (mélység ${DEPTH}):
 ${eng}
@@ -642,13 +642,16 @@ async function runAi(question) {
   const out = $("aiOut"), note = $("aiNote"), myPly = ply, key = aiKey();
   $("aiBtn").disabled = true; $("askBtn").disabled = true; $("aiStop").hidden = false;
   out.innerHTML = ""; note.textContent = "Az AI gondolkodik… (5–60 másodperc)";
-  const ctx = await contextBlock();
+  const ctx = await contextBlock(!!question);
   const prompt = question
-    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak. Válaszolj a kérdésre az alábbi állás alapján, magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen összhangban a megadott motoradatokkal; ne találj ki lépéseket, amelyek nem szabályosak. Legfeljebb 80 szó, szórakoztató hangon; számot (értékelést) és a „motor”/„Stockfish” szót ne említs, az állást szavakkal értékeld.
+    ? `Sakkedző vagy, aki magyarul magyaráz egy tanulni vágyó játékosnak.
+A JÁTÉKOS KÉRDÉSE: ${question}
 
-${ctx}
+Feladat: kizárólag erre a kérdésre válaszolj, közvetlenül, a válasz első mondata a kérdésre feleljen. NE elemezd az utoljára lejátszott lépést és ne írj általános állásértékelést, hacsak a kérdés kifejezetten nem erre vonatkozik. A kérdés vonatkozhat az állásra, a már lejátszott lépésekre, egy feltételezett (mi lenne, ha…) lépésre vagy általános sakkelméletre; ilyenkor is a kérdésre válaszolj. Az alábbi állásadatok csak háttérként szolgálnak a pontos válaszhoz.
+Magyarul, magyar figurajelöléssel (K, V, B, F, H). Ha konkrét változatot írsz, az legyen szabályos és összhangban a megadott adatokkal; ne találj ki lépéseket. Legfeljebb 80 szó, szórakoztató hangon; számot (értékelést) és a „motor”/„Stockfish” szót ne említs.
 
-A kérdés: ${question}`
+HÁTTÉR (nem a kérdés tárgya):
+${ctx}`
     : `Sakkedző vagy: vidám, szórakoztató, de szakmailag pontos. Magyarul beszélj, magyar figurajelöléssel (K=király, V=vezér, B=bástya, F=futó, H=huszár). Köszönés és bevezető nélkül, rögtön a címsorokkal. Pontosan három rövid szakasz, '## ' címsorral, összesen legfeljebb ${CFG["ai.maxWords"]} szó:
 ## Mi történt? (1–2 mondat)
 ## Miért jó vagy rossz? (2 mondat; ha a legjobb lépés más, mondd meg, miért jobb)
@@ -694,9 +697,16 @@ function speakMove(san, mark) {
 const SQ_RE = /(?<![\p{L}\d])([a-h])([1-8])(?![\p{L}\d])/gu; // önálló mezőnév a szövegben: e5, e5-ös, d5 és e6 mezők
 const NUM_HU = ["", "egy", "kettő", "három", "négy", "öt", "hat", "hét", "nyolc"];
 // Visszaadja a felolvasandó szöveget, a lépések ({from,to,fen}) és a hivatkozott mezők ({sq}) helyét benne
+// Sakkot kapott király mezője az állásban (nincs sakk: null)
+function checkedKing(fen) {
+  const ch = new Chess(fen); if (!ch.in_check()) return null;
+  const rows = ch.board(); // chess.js 0.10: a bábukon nincs "square" mező, a hely a tömbindexből jön
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const p = rows[y][x]; if (p && p.type === "k" && p.color === ch.turn()) return "abcdefgh"[x] + (8 - y); }
+  return null;
+}
 function buildSpeech(text, fenBefore, fenAfter) {
   let run = null;
-  const plain = t => t.replace(/\+(\d)/g, "plusz $1").replace(/\s+/g, " ");
+  const plain = t => t.replace(/\+(\d)/g, "plusz $1").replace(/(?<![\p{L}\d])\d+(?:\.{1,3}|…)(?=\s|$)\s*/gu, "").replace(/\s+/g, " "); // a sorszám (13. / 13...) kimarad, szünet sem lesz helyette
   const tryMove = (san) => {
     const starts = [run, fenAfter, fenBefore].filter(Boolean);
     for (const f of starts) {
@@ -710,7 +720,10 @@ function buildSpeech(text, fenBefore, fenAfter) {
   for (const m of text.matchAll(MOVE_RE)) {
     const san = (m[1] || m[2]), mv = tryMove(san);
     if (!mv) continue; // nem szabályos lépés ebben az állásban: sima szövegként marad
-    items.push({ kind: "move", idx: m.index, end: m.index + m[0].length, spoken: speakMove(san, m[3]), mv, fen: run.fen() });
+    // A lépés előtti sorszámot (13. / 13...) nem olvassuk fel, de a villogás/lejátszás a lépésre vonatkozik
+    const num = /\d+\.{1,3}\s?$/.exec(text.slice(0, m.index));
+    const numStart = num && !items.some(it => it.end > m.index - num[0].length) ? m.index - num[0].length : m.index;
+    items.push({ kind: "move", idx: numStart, end: m.index + m[0].length, spoken: speakMove(san, m[3]), mv, fen: run.fen() });
   }
   for (const m of text.matchAll(SQ_RE)) {
     if (items.some(it => it.kind === "move" && m.index >= it.idx && m.index < it.end)) continue; // lépés része
@@ -721,7 +734,7 @@ function buildSpeech(text, fenBefore, fenAfter) {
   for (const it of items) {
     out += plain(text.slice(last, it.idx));
     const start = out.length; out += it.spoken; last = it.end;
-    if (it.kind === "move") marks.push({ start, end: out.length, from: it.mv.from, to: it.mv.to, fen: it.fen });
+    if (it.kind === "move") marks.push({ start, end: out.length, from: it.mv.from, to: it.mv.to, fen: it.fen, king: checkedKing(it.fen) });
     else squares.push({ start, end: out.length, sq: it.sq });
   }
   out += plain(text.slice(last));
@@ -739,12 +752,14 @@ function applyBlink() {
 }
 function setBlink(arr) { blinkSquares = arr; applyBlink(); }
 function addBlink(sq) { if (!blinkSquares.includes(sq)) setBlink([...blinkSquares, sq]); }
+let checkKing = null; // az épp villogó, sakkot kapott király mezője (AI-lejátszás)
 let sayShown = null; // épp mutatott felolvasás-lépés (null = az eredeti állás látszik)
 function sayMove(mk) {
   if (mk === sayShown) return;
   sayShown = mk;
   if (!mk) { // vissza az eredeti állásra és a motor eredeti (zöld) nyilához
     renderBoard();
+    blinkSquares = blinkSquares.filter(q => q !== checkKing); checkKing = null; applyBlink();
     const ev = evalCache[game.fens[ply]]; if (ev?.best) engineArrow(ev.best);
     return;
   }
@@ -755,6 +770,10 @@ function sayMove(mk) {
     const [x, y] = sqXY(name); cells[y * 8 + x]?.classList.add(cls);
   }
   drawArrow(mk.from + mk.to, true); // a kimondott/elemzett lépés piros nyíllal
+  blinkKind = "red"; // sakk esetén a sakkot kapott király is villog, a lépéssel azonos (piros) színnel
+  blinkSquares = blinkSquares.filter(q => q !== checkKing); checkKing = mk.king;
+  if (mk.king && !blinkSquares.includes(mk.king)) blinkSquares.push(mk.king);
+  applyBlink();
   animateMove(mk.from, mk.to, captured, Number(CFG["animation.ms"]) || 900);
 }
 // Felolvasás: mondatonként egy felolvasás (folyamatos hang), a lépések és a mezővillogás szóhatár-eseményekkel vagy becsült időzítéssel szinkronban.
@@ -775,13 +794,15 @@ function startSpeech(source = "ai") { // "ai": az AI-elemzés (lépések + piros
   const sp = buildSpeech(text, ply > 0 ? game.fens[ply - 1] : null, game.fens[ply]);
   // műveletek a szövegben: AI-nél a lépések és a mezők; kommentárnál az állás nem mozdul, a lépések csak a célmezőjüket villogtatják
   const acts = fromComment ? [] : sp.marks.map(m => ({ pos: m.start, act: () => sayMove(m) }));
-  const refs = fromComment ? [...sp.squares, ...sp.marks.map(m => ({ start: m.start, sq: m.to }))] : sp.squares;
+  const refs = fromComment ? [...sp.squares, ...sp.marks.flatMap(m => [{ start: m.start, sq: m.to }, ...(m.king ? [{ start: m.start, sq: m.king }] : [])])] : sp.squares;
   if (CFG["speech.blinkSquares"] !== false) refs.forEach(q => acts.push({ pos: q.start, act: () => addBlink(q.sq) }));
   // Mondatonként egy felolvasás: a mondaton belül nincs vágás, így a hang folyamatos (a mondatok között természetes a szünet).
   const sents = []; const re = /[^.!?]+[.!?]*\s*/g; let mm;
   while ((mm = re.exec(sp.text))) if (mm[0].trim()) sents.push({ text: mm[0], start: mm.index, end: mm.index + mm[0].length });
   const lang = String(CFG["speech.lang"]);
-  const voice = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+  // A legkellemesebb magyar hang: természetes (Natural/Online) hangok előre, ezen belül a női (Noémi) hang
+  const voiceScore = v => (/natural|online/i.test(v.name) ? 4 : 0) + (/noémi|noemi|female|nő/i.test(v.name) ? 2 : 0) + (/microsoft|google/i.test(v.name) ? 1 : 0);
+  const voice = speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase())).sort((x, y) => voiceScore(y) - voiceScore(x))[0];
   if (!voice) $("aiNote").textContent = "Nincs magyar hang telepítve (Windows: Beállítások → Idő és nyelv → Beszéd).";
   $(fromComment ? "speakCmtBtn" : "speakBtn").textContent = "⏹ Leállítás";
   // A mondaton belüli lépéseket/mezőket a szóhatár-események (charIndex) vezérlik; ha a hang nem küld ilyet,
@@ -791,7 +812,7 @@ function startSpeech(source = "ai") { // "ai": az AI-elemzés (lépések + piros
     const mine = acts.filter(a => a.pos >= s.start && a.pos < s.end).sort((a, b) => a.pos - b.pos).map(a => ({ off: a.pos - s.start, act: a.act, done: false }));
     const fire = upTo => mine.forEach(a => { if (!a.done && a.off <= upTo) { a.done = true; a.act(); } });
     const u = new SpeechSynthesisUtterance(s.text);
-    u.lang = lang; u.rate = Number(CFG["speech.rate"]) || 1; if (voice) u.voice = voice;
+    u.lang = lang; u.rate = Number(CFG["speech.rate"]) || 1; u.pitch = Number(CFG["speech.pitch"]) || 1.05; if (voice) u.voice = voice;
     let t0 = 0;
     u.onstart = () => {
       if (run !== speechRun) return;

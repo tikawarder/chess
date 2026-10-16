@@ -13,7 +13,7 @@ A 2026-10-06 és 10-10 közötti beszélgetésben megbeszélt irányok. A 6. pon
 | # | Feladat | Megjegyzés |
 |---|---|---|
 | 1 | Chess.com-import felhasználónév alapján | Nyilvános API: `api.chess.com/pub/player/{név}/games/archives`, majd `/games/{év}/{hó}`. Lichess-hez hasonlóan. A PGN-bemásolás marad |
-| 2 | Stockfish 16/17 „lite”, egyszálas WASM | Erősebb a Stockfish 10-nél, és nem kell hozzá COOP/COEP fejléc |
+| 2 | Stockfish 16/17 „lite”, egyszálas WASM | Erősebb a Stockfish 10-nél, és nem kell hozzá COOP/COEP fejléc. **A helyi magyarázat (3. pont) és a krónika (17. pont) előfeltétele:** a `trial2` mérésben a Stockfish 10 13-as mélységben Baklövésnek minősítette Kaszparov híres áldozatát (Be7+), lásd lent |
 | 3 | **Szabályalapú (helyi, AI nélküli) magyar magyarázatok** | A Stockfish-adatokból és a chess.js-sel vizsgált állásból: ütésben hagyott figura, villa, kötés, kihagyott matt, anyagvesztés, „jobb lett volna: …”, megnyitásnév a fejlécből. Változatos sablonok, dicséret, összesítő (pontosság %). **Terv rögzítve 2026-10-11, még nincs megvalósítva:** lásd lent „Helyi magyarázat kommentár nélküli lépésekhez” |
 | 4 | ~~PGN `{…}` kommentárok megtartása~~ **Megvalósítva (2026-10-11)** | A kommentárok, a minősítések (`!`, `?!`, …) és a változatok megjelennek; az idegen nyelvű kommentár automatikusan magyarra fordítódik (`pgn.js`, `/api/translate`) |
 | 5 | Egyszeri Claude-elemzés mentéssel | Egy gomb a teljes játszmát elemzi; az eredmény JSON-ként vagy kommentált PGN-ként mentődik, utána AI nélkül újranézhető |
@@ -25,6 +25,8 @@ A 2026-10-06 és 10-10 közötti beszélgetésben megbeszélt irányok. A 6. pon
 | 11 | ~~PGN fájl kiválasztása a gépről~~ **Megvalósítva (2026-10-11)** | Fájlválasztó a „Saját játszma betöltése” dobozban, Latin-1 fájlokkal is |
 | 15 | Játszmakönyvtár fejlesztései | A `games` mappa fejléc-indexe már működik, kereséssel (név, év, esemény, regex, elírás-tűrés). Későbbi: nagy gyűjtemények (KingBase, PGN Mentor) tartós indexe (IndexedDB/SQLite), évintervallum-szűrő, Lichess tanulmány-azonosító szerinti letöltés |
 | 13 | **A mérkőzés története és érdekességei** (AI) | Lásd lent: „Történet és érdekességek”. Döntés 2026-10-10: egyelőre csak a ROADMAP-ban, nincs megvalósítva |
+| 16 | **Szavakra fordított értékelés a kártyán** | A „Értékelés: +1.0 · Legjobb folytatás: e4 d5 …” számsor helyett szöveg („kiegyenlített”, „világos érezhetően jobban áll”, „Pontatlanság: Vc4 helyett Bhe8 volt a pontosabb”). Meglévő adatból, tokenmentes. Becslés: ~1–2 óra. Részletek lent |
+| 17 | **Játszma-krónika (fordulópontok + egyetlen AI-hívás)** | A motor megtalálja a fordulópontokat, az AI egy kéréssel szórakoztató szöveget ír hozzájuk, gyorsítótárba kerül. Becslés: ~fél nap. Részletek lent |
 | 14 | **AI-tartalék: ha nincs (vagy ki van kapcsolva) az API-kulcs, a számítógépen futó AI-ügynök (pl. Claude Code, Gemini CLI) dolgozik** | Lásd lent: „AI-szolgáltató tartalék”. Egyelőre csak ötlet, nincs megvalósítva |
 | 12 | Előre generált magyar kommentárok a katalógushoz | A Gemini egyszer generálja és a katalógusba menti, így lejátszáskor nem kell minden lépéshez AI-hívás (becslés: ~0,0007 USD / lépés, a Fischer–Szpasszkij meccs ~0,6 USD) |
 
@@ -118,6 +120,42 @@ Megvalósítási terv:
 5. Első körben a táblázat első 4–5 sora, a többi később.
 
 Nyitott kérdések: automatikusan jelenjen-e meg minden kommentár nélküli lépésnél, vagy csak gombra; mennyire legyen részletes (egy mondat vagy 2–3).
+
+### Mérés a `trial2` játszmával (Kaszparov–Topalov 1999, 2026-10-11)
+
+Cél: mit ad a Stockfish a kommentár nélküli lépéseknél. A játszmában 87 lépés van, ebből **csak a 47.-nek (Rxd4!!) van kommentárja, 86 lépés üres**. A motor 13-as mélységgel, ~1,4 mp/állás sebességgel dolgozott (a teljes játszma ~2 perc, a háttérben fut); az első 64 lépés eredménye:
+
+| Amit a motor ad | Eredmény |
+|---|---|
+| Címke | 27× Legjobb lépés, 13× Pontatlanság, 12× Hiba, 6× Jó, 3× Kiváló, 2× Baklövés, 1× Kényszerlépés |
+| Mi lett volna jobb | lépésenként elérhető (pl. a 60. lépésnél Vc4 helyett Bhe8, kb. 1,9 gyalognyi romlás) |
+| Fordulópontok | az értékelésváltozás nagysága alapján azonosíthatók (pl. a 49., 53., 54., 55., 60. lépés) |
+| Mondat, humor, történet | **nincs**: a motor csak számot és legjobb sort ad |
+
+Fontos lelet: a **Stockfish 10, 13-as mélységben tévesen Baklövésnek minősítette a 49. lépést (Be7+)**, Kaszparov híres áldozatát. A mély, taktikai áldozatokat a gyors, régi motor rosszul ítéli meg, ezért a helyi/AI szöveg alapjául szolgáló minősítésnek megbízhatóbbnak kell lennie: **motorfrissítés (2. pont) és nagyobb mélység kell**, vagy legalább egy kivétel az áldozatokra (anyagot adó, de értékelést nem romboló lépés ne kapjon Hiba/Baklövés címkét). A nyers értékelés mélység 13-nál zajos is (pl. egymás utáni állások értékelése között ugrás).
+
+### Javasolt irány: helyi tények + egyetlen AI-hívás a fordulópontokra
+
+| Réteg | Mit ad | Token |
+|---|---|---|
+| **1. Szavakra fordított értékelés** (16. pont) | „kiegyenlített”, „világos érezhetően jobban áll”, „Pontatlanság: Vc4 helyett Bhe8 volt a pontosabb” | 0 |
+| **2. Állásvizsgáló** (3. pont) | védtelen figura, ütés, matt, villa/kötés: tényszerű, változatos mondatok sablonokból | 0 |
+| **3. Játszma-krónika** (17. pont) | a motor a fordulópontokat (nagy értékelésváltozás, áldozat, matt) megtalálja; az AI **egyetlen kéréssel** szórakoztató szöveget ír 6–10 ponthoz, plusz nyitás és vég; gyorsítótárba kerül | ~1–2 ezer token / játszma ≈ **$0,001–0,002** |
+
+Az AI így csak ott dolgozik, ahol érdemes, egy hívásban (a fordító végpont mintájára: tömb be, tömb ki, szerveroldali gyorsítótár), nem lépésenként, ami a tokenkímélési elvvel is egyezik. A „nincs motorszám a szövegben” szabály itt is érvényes.
+
+### Becsült munka (becslés, nem mérés)
+
+| Lépés | Becsült munka | Megjegyzés |
+|---|---|---|
+| 1. Szavakra fordított értékelés a kártyán | ~1–2 óra | meglévő adatból, kb. 100 sor |
+| 2. Állásvizsgáló + sablonok + tesztek | ~fél–1 nap | kb. 300–500 sor, 3–5 mondatváltozat észleléssel |
+| 3. Fordulópont-kereső + egyetlen AI-hívás + gyorsítótár + kártya | ~fél nap | a fordító végpont mintájára, tesztek hamis Gemini-szerverrel |
+| 4. Motor frissítése (Stockfish 16/17) és mélység | ~2–4 óra | állásonként lassabb, tesztelni kell; mélység a `settings.properties`-ben |
+
+Javasolt sorrend: **1 → 4 → 3 → 2**. Az 1. gyors nyereség; a 4. nélkül a minősítés téves lehet; a 3. adja a szórakoztató élményt; a 2. teszi tokenmentessé a maradék lépéseket.
+
+Nyitott kérdések: a krónika **automatikusan** készüljön-e a játszma megnyitásakor (~$0,002 új játszmánként, utána gyorsítótárból), vagy gombra; a fordulópontok száma és a küszöb (mekkora értékelésváltozás számít); az áldozatok kezelése a címkézésben.
 
 ## Csomagolás – döntés még nincs
 
