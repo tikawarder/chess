@@ -111,12 +111,16 @@ async function askGemini(prompt, { apiKey, model, baseUrl, fetchImpl, signal, te
   return { text, truncated: cand.finishReason === "MAX_TOKENS", usage: { prompt: u.promptTokenCount || 0, output, total: u.totalTokenCount || 0 } };
 }
 
+const studies = require("./studies");
+const onlineLimits = st => ({ minComments: st["online.minComments"], minChars: st["online.minChars"] }); // játszmánkénti alsó küszöb a kommentárokra
+
 function createServer(opts = {}) {
   const cfg = {
     apiKey: opts.apiKey ?? process.env.GEMINI_API_KEY,
     model: opts.model, // ha nincs megadva: GEMINI_MODEL env, majd settings.properties
     baseUrl: opts.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta",
-    fetchImpl: opts.fetchImpl ?? fetch
+    fetchImpl: opts.fetchImpl ?? fetch,
+    studyFetch: opts.studyFetch ?? fetch
   };
   const indexHtml = path.join(__dirname, "index.html");
   const usageFile = opts.usageFile === undefined ? path.join(__dirname, "usage.jsonl") : opts.usageFile; // null = nincs napló
@@ -177,6 +181,19 @@ function createServer(opts = {}) {
         if (pgn === null) { library.scan(libraryDir(loadSettings(settingsFile))); pgn = library.rawGame(f, n); } // újraindítás után előbb be kell olvasni
         return pgn === null ? send(res, 404, { error: "not_found" }) : send(res, 200, { pgn });
       }
+      if (req.method === "GET" && url.pathname === "/api/online/search") { // Lichess-tanulmányok keresése (csak kommentáros játszmák)
+        const sp = url.searchParams, players = [sp.get("p1"), sp.get("p2")].map(x => (x || "").trim().slice(0, 60)).filter(Boolean);
+        const ctl = new AbortController(); res.on("close", () => { if (!res.writableEnded) ctl.abort(); });
+        const out = await studies.search({ players, date: (sp.get("date") || "").slice(0, 20), place: (sp.get("place") || "").slice(0, 60) }, { fetchImpl: cfg.studyFetch, signal: ctl.signal, limits: onlineLimits(loadSettings(settingsFile)) });
+        return send(res, 200, out);
+      }
+      if (req.method === "POST" && url.pathname === "/api/online/download") {
+        let id; try { id = JSON.parse(await readBody(req)).id; } catch (e) { return send(res, e.status || 400, { error: "bad_json" }); }
+        const out = await studies.download(String(id || ""), { fetchImpl: cfg.studyFetch, limits: onlineLimits(loadSettings(settingsFile)) });
+        const dir = path.join(libraryDir(loadSettings(settingsFile)), "letoltott"); fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, out.file), out.text, "utf8"); // a fájlnév a szigorúan ellenőrzött azonosítóból készül
+        return send(res, 200, { file: "letoltott/" + out.file, games: out.games });
+      }
       if (req.method === "POST" && url.pathname === "/api/translate") {
         if (!cfg.apiKey) return send(res, 503, { error: "no_key" });
         const st = loadSettings(settingsFile);
@@ -206,7 +223,7 @@ function createServer(opts = {}) {
       }
       send(res, 404, { error: "not_found" });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 500, { error: e.message === "upstream" ? "upstream" : "server_error" }); // a részletek (kulcs!) nem szivárognak
+      if (!res.headersSent) send(res, e.status || 500, { error: ["upstream", "empty", "bad_id", "no_comments"].includes(e.message) ? e.message : "server_error" }); // a részletek (kulcs!) nem szivárognak
     }
   });
 }
